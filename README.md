@@ -4,6 +4,9 @@
 
 [![Hits](https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fgithub.com%2Fjinwyp%2Fone_click_script&count_bg=%2379C83D&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=hits&edge_flat=false)](https://hits.seeyoufarm.com)
 
+## Sponsors
+Thanks for support this project. Check on [patreon](https://www.patreon.com/linuxkernel)
+
 ## Table of Contents
 
 * [Install Trojan/Trojan-go and V2ray/Xray shell script](#installation)
@@ -14,7 +17,8 @@
 * [Install V2Ray-Poseidon, Soga, XrayR, Air-Universe shell script for V2board panel](/TOOL.md)
 * [PVE Proxmox VE and Synology DiskStation Manager NAS Toolkit](/dsm/readme.md)
 * [Install FRP shell script (expose local server behind a NAT or firewall to the Internet tool)](/dsm/readme.md)
-
+* [How to enable DOH for DNS](/DNS.md)
+* [Install DNS server AdGuard Home and Mosdns to divert domestic and foreign dns traffic](/DNS.md)
 
 
 
@@ -81,8 +85,10 @@ wget --no-check-certificate https://raw.githubusercontent.com/jinwyp/one_click_s
 
 1. Run script then choose 26 to request SSL certificate for any domains. It's better to disable CDN of your domain duiring the SSL certificate application process. Make sure the domain is resolved to the real VPS ip.
 2. Duiring the SSL certificate application process, if you can't disable CDN or the VPS only have IPv6, you can skip the IP check process to continue your following SSL certificate request.
-3. The script is using acme.sh to get SSL certificate. There are three providers: Let's Encrypt, BuyPass.com, ZeroSSL.com. When you request too many times in one day and reach the limit of Let's Encrypt, you can switch other providers such as BuyPass.com.
+3. The script is using acme.sh to get SSL certificate. There are 4 providers: Let's Encrypt, BuyPass.com, ZeroSSL.com, Google. When you request too many times in one day and reach the limit of Let's Encrypt, you can switch other providers such as BuyPass.com.
 4. Normally SSL certificate need renew in three month，The script will autorenew the certificate with Cronjob by acme.sh .
+
+![功能列表4](https://github.com/jinwyp/one_click_script/blob/master/docs/readme4.png?raw=true)
 
 
 #####  [The Rate Limits rule of Let's Encrypt](https://letsencrypt.org/docs/rate-limits/)

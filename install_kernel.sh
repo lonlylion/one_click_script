@@ -26,6 +26,7 @@
 # ubuntu18 安装完成默认内核  linux-generic 4.15.0.140, linux-headers-4.15.0-140
 # ubuntu20 安装完成默认内核  linux-image-5.4.0-70-generic , linux-headers-5.4.0-70 
 # debian10 安装完成默认内核  4.19.0-16-amd64
+# debian11 安装完成默认内核  linux-image-5.10.0-8-amd64
 
 # UJX6N 编译的bbr plus 内核  5.10.27-bbrplus    5.9.16    5.4.86  
 # UJX6N 编译的bbr plus 内核  4.19.164   4.14.213    4.9.264-1.bbrplus
@@ -132,19 +133,20 @@ getLinuxOSVersion(){
         osInfo=$NAME
         osReleaseVersionNo=$VERSION_ID
 
-        if [ -n $VERSION_CODENAME ]; then
+        if [ -n "$VERSION_CODENAME" ]; then
             osReleaseVersionCodeName=$VERSION_CODENAME
         fi
     elif type lsb_release >/dev/null 2>&1; then
         # linuxbase.org
         osInfo=$(lsb_release -si)
         osReleaseVersionNo=$(lsb_release -sr)
+
     elif [ -f /etc/lsb-release ]; then
         # For some versions of Debian/Ubuntu without lsb_release command
         . /etc/lsb-release
         osInfo=$DISTRIB_ID
-        
         osReleaseVersionNo=$DISTRIB_RELEASE
+        
     elif [ -f /etc/debian_version ]; then
         # Older Debian/Ubuntu/etc.
         osInfo=Debian
@@ -271,14 +273,28 @@ virt_check(){
 
 function installSoftDownload(){
 	if [[ "${osRelease}" == "debian" || "${osRelease}" == "ubuntu" ]]; then
-        if [[ "${osRelease}" == "debian" ]]; then
-            echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" > /etc/apt/sources.list.d/buster-backports.list
-            echo "deb-src http://deb.debian.org/debian buster-backports main contrib non-free" >> /etc/apt/sources.list.d/buster-backports.list
-            ${sudoCmd} apt update
-        fi
+
+
+		if ! dpkg -l | grep -qw curl; then
+			${osSystemPackage} -y install wget curl git
+
+            if [[ "${osRelease}" == "debian" ]]; then
+                echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" > /etc/apt/sources.list.d/buster-backports.list
+                echo "deb-src http://deb.debian.org/debian buster-backports main contrib non-free" >> /etc/apt/sources.list.d/buster-backports.list
+                ${sudoCmd} apt update -y
+            fi
+
+		fi
 
 		if ! dpkg -l | grep -qw wget; then
 			${osSystemPackage} -y install wget curl git
+
+            if [[ "${osRelease}" == "debian" ]]; then
+                echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" > /etc/apt/sources.list.d/buster-backports.list
+                echo "deb-src http://deb.debian.org/debian buster-backports main contrib non-free" >> /etc/apt/sources.list.d/buster-backports.list
+                ${sudoCmd} apt update -y
+            fi
+
 		fi
 
         if ! dpkg -l | grep -qw bc; then
@@ -309,6 +325,30 @@ function installSoftDownload(){
 	fi
     
 }
+
+
+
+
+
+
+
+
+
+# 更新本脚本
+function upgradeScript(){
+    wget -Nq --no-check-certificate -O ./install_kernel.sh "https://raw.githubusercontent.com/jinwyp/one_click_script/master/install_kernel.sh"
+    green " 本脚本升级成功! "
+    chmod +x ./install_kernel.sh
+    sleep 2s
+    exec "./install_kernel.sh"
+}
+
+
+
+
+
+
+
 
 
 function rebootSystem(){
@@ -389,6 +429,20 @@ versionCompareWithOp () {
         return 0
     fi
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 osKernelVersionFull=$(uname -r)
@@ -721,7 +775,7 @@ function removeOptimizingSystemConfig(){
 	sed -i '/net.ipv4.tcp_timestamps/d' /etc/sysctl.conf
 	sed -i '/net.ipv4.tcp_max_orphans/d' /etc/sysctl.conf
 
-	sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
+	# sed -i '/net.ipv4.ip_forward/d' /etc/sysctl.conf
 
 
     sed -i '/1000000/d' /etc/security/limits.conf
@@ -778,7 +832,7 @@ net.ipv4.tcp_timestamps = 0
 net.ipv4.tcp_max_orphans = 32768
 
 # forward ipv4
-net.ipv4.ip_forward = 1
+#net.ipv4.ip_forward = 1
 
 
 EOF
@@ -871,7 +925,7 @@ isInstallFromRepo="no"
 userHomePath="${HOME}/download_linux_kernel"
 linuxKernelByUser="elrepo"
 linuxKernelToBBRType=""
-linuxKernelToInstallVersion="5.10"
+linuxKernelToInstallVersion="5.15"
 linuxKernelToInstallVersionFull=""
 
 elrepo_kernel_name="kernel-ml"
@@ -931,8 +985,11 @@ function installKernel(){
 
 
 function getVersionBBRPlus(){
-    if [ "${linuxKernelToInstallVersion}" = "5.14" ]; then 
-        bbrplusKernelVersion=$(getGithubLatestReleaseVersionBBRPlus "UJX6N/bbrplus-5.14")
+    if [ "${linuxKernelToInstallVersion}" = "5.17" ]; then 
+        bbrplusKernelVersion=$(getGithubLatestReleaseVersionBBRPlus "UJX6N/bbrplus-5.17")
+
+    elif [ "${linuxKernelToInstallVersion}" = "5.15" ]; then 
+        bbrplusKernelVersion=$(getGithubLatestReleaseVersionBBRPlus "UJX6N/bbrplus-5.15")
 
     elif [ "${linuxKernelToInstallVersion}" = "5.10" ]; then 
         bbrplusKernelVersion=$(getGithubLatestReleaseVersionBBRPlus "UJX6N/bbrplus-5.10")
@@ -1000,11 +1057,16 @@ function getLatestCentosKernelVersion(){
             elrepo_kernel_version_ml_Teddysun_latest_version="5.${elrepo_kernel_version_ml_Teddysun_latest_version_middle}"
 
             # https://stackoverflow.com/questions/229551/how-to-check-if-a-string-contains-a-substring-in-bash
-            for ver in ${elrepo_kernel_version_ml_teddysun_ftp_array_lts[@]}; do
+            for ver in "${elrepo_kernel_version_ml_teddysun_ftp_array_lts[@]}"; do
                 
                 if [[ ${ver} == *"5.10"* ]]; then
                     # echo "符合所选版本的Linux 5.10 内核版本: ${ver}"
                     elrepo_kernel_version_ml_Teddysun510=${ver}
+                fi
+
+                if [[ ${ver} == *"5.15"* ]]; then
+                    # echo "符合所选版本的Linux 5.15 内核版本: ${ver}"
+                    elrepo_kernel_version_ml_Teddysun515=${ver}
                 fi
 
                 if [[ ${ver} == *"${elrepo_kernel_version_ml_Teddysun_latest_version}"* ]]; then
@@ -1016,6 +1078,7 @@ function getLatestCentosKernelVersion(){
 
             green "Centos elrepo 源的最新的Linux 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml}" 
             green "由 Teddysun 编译的 Centos 最新的Linux 5.10 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun510}" 
+            green "由 Teddysun 编译的 Centos 最新的Linux 5.15 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun515}" 
             green "由 Teddysun 编译的 Centos 最新的Linux 5.xx 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun_latest}" 
             
         fi
@@ -1123,7 +1186,7 @@ function installCentosKernelManual(){
         if [ "${kernelVersionFirstletter}" = "5" ]; then 
             linuxKernelByUser="elrepo"
 
-            if [[ "${linuxKernelToInstallVersion}" == "5.10" || "${linuxKernelToInstallVersion}" == "5.15" || "${linuxKernelToInstallVersion}" == "5.16" ]]; then 
+            if [[ "${linuxKernelToInstallVersion}" == "5.10" || "${linuxKernelToInstallVersion}" == "5.15" || "${linuxKernelToInstallVersion}" == "5.17" ]]; then 
                 linuxKernelByUserTeddysun="Teddysun"
             fi
         else
@@ -1163,6 +1226,12 @@ function installCentosKernelManual(){
             # https://dl.lamp.sh/kernel/el7/kernel-ml-5.10.37-1.el7.x86_64.rpm
             # https://dl.lamp.sh/kernel/el8/kernel-ml-5.10.27-1.el8.x86_64.rpm
             # https://dl.lamp.sh/kernel/el8/kernel-ml-5.10.27-1.el8.x86_64.rpm
+
+        elif [ "${linuxKernelToInstallVersion}" = "5.15" ]; then 
+            elrepo_kernel_name="kernel-ml"
+            elrepo_kernel_version=${elrepo_kernel_version_ml_Teddysun515}
+            elrepo_kernel_filename=""
+            ELREPODownloadUrl="https://dl.lamp.sh/kernel/el${osReleaseVersionNoShort}"
 
         elif [ "${linuxKernelToInstallVersion}" = "${elrepo_kernel_version_ml_Teddysun_latest_version}" ]; then
             elrepo_kernel_name="kernel-ml"
@@ -1600,13 +1669,14 @@ function getLatestUbuntuKernelVersion(){
     echo
     green "Ubuntu mainline 最新的Linux 内核 kernel 版本号为 ${ubuntuKernelLatestVersion}" 
     
-    for ver in ${ubuntuKernelLatestVersionArray[@]}; do
+    for ver in "${ubuntuKernelLatestVersionArray[@]}"; do
         
         if [[ ${ver} == *"${linuxKernelToInstallVersion}"* ]]; then
-            # echo "符合所选版本的Linux 内核版本: ${ver}"
+            # echo "符合所选版本的Linux 内核版本: ${ver}, 选择的版本为 ${linuxKernelToInstallVersion}"
             ubuntuKernelVersion=${ver}
         fi
     done
+    
     
     green "即将安装的内核版本: ${ubuntuKernelVersion}"
     ubuntuDownloadUrl="https://kernel.ubuntu.com/~kernel-ppa/mainline/v${ubuntuKernelVersion}/amd64"
@@ -1637,32 +1707,47 @@ function installDebianUbuntuKernel(){
         if [ "${linuxKernelToBBRType}" = "xanmod" ]; then 
 
             green " =================================================="
-            green "    开始通过 XanMod 官方源安装 linux 内核 ${linuxKernelToInstallVersion}"
+            green "    开始准备从 XanMod 官方源安装 linux 内核 ${linuxKernelToInstallVersion}"
             green " =================================================="
 
             # https://xanmod.org/
-
+            
+            
             echo 'deb http://deb.xanmod.org releases main' > /etc/apt/sources.list.d/xanmod-kernel.list
             wget -qO - https://dl.xanmod.org/gpg.key | sudo apt-key --keyring /etc/apt/trusted.gpg.d/xanmod-kernel.gpg add -
-            ${sudoCmd} apt update
+            ${sudoCmd} apt update -y
 
             listAvailableLinuxKernel "xanmod"
 
+            linuxKernelToInstallVersionFull=${linuxKernelToInstallVersion}
             echo
             green " =================================================="
-            green " 开始安装 linux 内核版本: ${linuxKernelToInstallVersionFull}"
+            green " 开始安装 linux 内核版本: XanMod ${linuxKernelToInstallVersionFull}"
             echo
 
-            if [ "${linuxKernelToInstallVersion}" = "5.10" ]; then
-                ${sudoCmd} apt install -y linux-xanmod-lts-5.10-generic 
+            if [ "${linuxKernelToInstallVersion}" = "5.15" ]; then
+                ${sudoCmd} apt install -y linux-xanmod-lts 
             else
                 ${sudoCmd} apt install -y linux-xanmod
             fi
 
+
+            listInstalledLinuxKernel
             rebootSystem
         else
 
-            debianKernelVersion="5.10.0"
+            if [ "${linuxKernelToInstallVersion}" = "5.10" ]; then
+                debianKernelVersion="5.10.0-15"
+            elif [ "${linuxKernelToInstallVersion}" = "4.19" ]; then
+                debianKernelVersion="4.19.0-0"
+            else
+                debianKernelVersion="5.16.0-0"
+                if [ "${osReleaseVersionNo}" = "11" ]; then
+                    debianKernelVersion="5.18.0-0"
+                fi
+            fi
+
+
 
             green " =================================================="
             green "    开始通过 Debian 官方源安装 linux 内核 ${debianKernelVersion}"
@@ -1675,14 +1760,21 @@ function installDebianUbuntuKernel(){
 
             linuxKernelToInstallVersionFull=${debianKernelVersion}
 
-            echo "deb http://deb.debian.org/debian buster-backports main contrib non-free" > /etc/apt/sources.list.d/buster-backports.list
-            echo "deb-src http://deb.debian.org/debian buster-backports main contrib non-free" >> /etc/apt/sources.list.d/buster-backports.list
-            ${sudoCmd} apt update
+            # echo "deb http://deb.debian.org/debian $osReleaseVersionCodeName-backports main contrib non-free" > /etc/apt/sources.list.d/$osReleaseVersionCodeName-backports.list
+            # echo "deb-src http://deb.debian.org/debian $osReleaseVersionCodeName-backports main contrib non-free" >> /etc/apt/sources.list.d/$osReleaseVersionCodeName-backports.list
+            ${sudoCmd} apt update -y
 
             listAvailableLinuxKernel
             
-            ${sudoCmd} apt install -y -t buster-backports linux-image-amd64
-            ${sudoCmd} apt install -y -t buster-backports firmware-linux firmware-linux-nonfree
+            echo
+            green " apt --fix-broken install"
+            ${sudoCmd} apt --fix-broken install
+
+            #green " apt install -y -t $osReleaseVersionCodeName-backports linux-image-amd64"
+            #${sudoCmd} apt install -y -t $osReleaseVersionCodeName-backports linux-image-amd64
+
+            #green " apt install -y -t $osReleaseVersionCodeName-backports firmware-linux firmware-linux-nonfree"         
+            #${sudoCmd} apt install -y -t $osReleaseVersionCodeName-backports firmware-linux firmware-linux-nonfree
 
             echo
             echo "dpkg --get-selections | grep linux-image-${debianKernelVersion} | awk '/linux-image-[4-9]./{print \$1}' | awk -F'linux-image-' '{print \$2}' "
@@ -1690,15 +1782,19 @@ function installDebianUbuntuKernel(){
             
             echo
             green " Debian 官方源安装 linux 内核版本: ${debianKernelVersionPackageName}"
-            green " 开始安装 linux-headers  命令为:  apt install -y linux-headers-${debianKernelVersionPackageName}"
             echo
+    
+            green " 开始安装 linux-image  命令为:  apt install -y linux-image-${debianKernelVersionPackageName}"
+            ${sudoCmd} apt install -y linux-image-${debianKernelVersionPackageName}
+            echo
+            green " 开始安装 linux-headers  命令为:  apt install -y linux-headers-${debianKernelVersionPackageName}"    
             ${sudoCmd} apt install -y linux-headers-${debianKernelVersionPackageName}
             # ${sudoCmd} apt-get -y dist-upgrade
-
+            
         fi
 
     else
-
+        echo
         green " =================================================="
         green "    开始手动安装 linux 内核 "
         green " =================================================="
@@ -1730,6 +1826,42 @@ function installDebianUbuntuKernel(){
             fi     
         
             ${sudoCmd} dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb 
+        fi
+        
+        if [[ "${linuxKernelToInstallVersion}" == "5.17" || "${linuxKernelToInstallVersion}" == "5.10.118" || "${linuxKernelToInstallVersion}" == "5.15" ]]; then 
+            if [ -f "${userHomePath}/libssl3_3.0.2-0ubuntu1_amd64.deb" ]; then
+                green "文件已存在, 不需要下载, 文件原下载地址: http://mirrors.kernel.org/ubuntu/pool/main/o/openssl/libssl3_3.0.2-0ubuntu1_amd64.deb "
+            else 
+                green "文件下载中... 下载地址: http://mirrors.kernel.org/ubuntu/pool/main/o/openssl/libssl3_3.0.2-0ubuntu1_amd64.deb "
+                wget -P ${userHomePath} http://mirrors.kernel.org/ubuntu/pool/main/o/openssl/libssl3_3.0.2-0ubuntu1_amd64.deb
+            fi
+
+            if [ -f "${userHomePath}/libc6_2.35-0ubuntu3_amd64.deb" ]; then
+                green "文件已存在, 不需要下载, 文件原下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc6_2.35-0ubuntu3_amd64.deb "
+            else 
+                green "文件下载中... 下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc6_2.35-0ubuntu3_amd64.deb "
+                wget -P ${userHomePath} http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc6_2.35-0ubuntu3_amd64.deb
+            fi 
+
+            if [ -f "${userHomePath}/locales_2.35-0ubuntu3_all.deb" ]; then
+                green "文件已存在, 不需要下载, 文件原下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/locales_2.35-0ubuntu3_all.deb "
+            else 
+                green "文件下载中... 下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/locales_2.35-0ubuntu3_all.deb "
+                wget -P ${userHomePath} http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/locales_2.35-0ubuntu3_all.deb
+            fi 
+
+            if [ -f "${userHomePath}/libc-bin_2.35-0ubuntu3_amd64.deb" ]; then
+                green "文件已存在, 不需要下载, 文件原下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc-bin_2.35-0ubuntu3_amd64.deb "
+            else 
+                green "文件下载中... 下载地址: http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc-bin_2.35-0ubuntu3_amd64.deb "
+                wget -P ${userHomePath} http://mirrors.kernel.org/ubuntu/pool/main/g/glibc/libc-bin_2.35-0ubuntu3_amd64.deb
+            fi
+            
+            ${sudoCmd} dpkg -i locales_2.35-0ubuntu3_all.deb
+            ${sudoCmd} dpkg -i libc-bin_2.35-0ubuntu3_amd64.deb
+            ${sudoCmd} dpkg -i libssl3_3.0.2-0ubuntu1_amd64.deb
+            ${sudoCmd} dpkg -i libc6_2.35-0ubuntu3_amd64.deb
+
         fi
 
 
@@ -1943,6 +2075,37 @@ function vps_netflix_jin(){
 }
 
 
+function vps_netflix_jin_auto(){
+    # wget -qN --no-check-certificate -O ./nf.sh https://raw.githubusercontent.com/jinwyp/SimpleNetflix/dev/nf.sh && chmod +x ./nf.sh
+    cd ${HOME}
+	wget -qN --no-check-certificate -O ./nf.sh https://raw.githubusercontent.com/jinwyp/one_click_script/master/netflix_check.sh && chmod +x ./nf.sh 
+    
+    echo
+    green " =================================================="
+    green " 通过Cron定时任务 每天自动检测Netflix是否解锁非自制剧"
+    green " 如果检测到Netflix没有解锁 会自动刷新 WARP IP, 默认尝试刷新20次"
+    green " 刷新日志 log 在 /root/warp_refresh.log"
+    green " Auto refresh Cloudflare WARP IP to unlock Netflix non-self produced drama"
+    green " =================================================="
+    echo
+    (crontab -l ; echo "10 5 * * 0,1,2,3,4,5,6 /root/nf.sh auto >> /root/warp_refresh.log ") | sort - | uniq - | crontab -
+    echo
+
+    ./nf.sh auto
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2020,7 +2183,7 @@ function installWARPClient(){
 
         curl https://pkg.cloudflareclient.com/pubkey.gpg | ${sudoCmd} apt-key add -
         
-        echo "deb http://pkg.cloudflareclient.com/ $osReleaseVersionCodeName main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+        echo "deb http://pkg.cloudflareclient.com/ $osReleaseVersionCodeName main" | ${sudoCmd} tee /etc/apt/sources.list.d/cloudflare-client.list
 
         ${sudoCmd} apt-get update
         ${sudoCmd} apt install -y cloudflare-warp 
@@ -2050,8 +2213,8 @@ function installWARPClient(){
 
     echo 
     echo
-    read -p "是否生成随机的WARP SOCKS5 端口号? 直接回车默认 40000 不生成随机端口号, 请输入[y/N]:" isWarpPortInput
-    isWarpPortInput=${isWarpPortInput:-n}
+    read -p "是否生成随机的WARP SOCKS5 端口号? 默认随机端口, 输入N为设置固定端口号40000, 请输入[Y/n]:" isWarpPortInput
+    isWarpPortInput=${isWarpPortInput:-y}
 
     if [[ $isWarpPortInput == [Nn] ]]; then
         echo
@@ -2084,11 +2247,11 @@ function installWARPClient(){
 
     # (crontab -l ; echo "10 6 * * 0,1,2,3,4,5,6 warp-cli disable-always-on ") | sort - | uniq - | crontab -
     # (crontab -l ; echo "11 6 * * 0,1,2,3,4,5,6 warp-cli disconnect ") | sort - | uniq - | crontab -
-    (crontab -l ; echo "12 6 * * 0,1,2,3,4,5,6 systemctl restart warp-svc ") | sort - | uniq - | crontab -
+    (crontab -l ; echo "12 6 * * 1,4 systemctl restart warp-svc ") | sort - | uniq - | crontab -
     # (crontab -l ; echo "16 6 * * 0,1,2,3,4,5,6 warp-cli connect ") | sort - | uniq - | crontab -
     # (crontab -l ; echo "17 6 * * 0,1,2,3,4,5,6 warp-cli enable-always-on ") | sort - | uniq - | crontab -
 
-
+    
 
     echo
     green " ================================================== "
@@ -2346,6 +2509,8 @@ function installWGCF(){
     # 启用守护进程
     ${sudoCmd} systemctl start wg-quick@wgcf
 
+    (crontab -l ; echo "12 6 * * 1 systemctl restart wg-quick@wgcf ") | sort - | uniq - | crontab -
+
     checkWireguardBootStatus
 
     echo
@@ -2404,7 +2569,7 @@ function enableWireguardIPV6OrIPV4(){
         sed -i 's/162\.159\.192\.1/\[2606\:4700\:d0\:\:a29f\:c001\]/g' ${configWireGuardConfigFilePath}
 
         sed -i 's/^DNS = 1\.1\.1\.1/DNS = 2620:fe\:\:10,2001\:4860\:4860\:\:8888,2606\:4700\:4700\:\:1111/g'  ${configWireGuardConfigFilePath}
-        sed -i 's/^DNS = 8\.8\.8\.8,1\.1\.1\.1,9\.9\.9\.10/DNS = 2620:fe\:\:10,2001\:4860\:4860\:\:8888,2606\:4700\:4700\:\:1111/g'  ${configWireGuardConfigFilePath}
+        sed -i 's/^DNS = 8\.8\.8\.8,8\.8\.4\.4,1\.1\.1\.1,9\.9\.9\.10/DNS = 2620:fe\:\:10,2001\:4860\:4860\:\:8888,2606\:4700\:4700\:\:1111/g'  ${configWireGuardConfigFilePath}
         
         echo "nameserver 2a00:1098:2b::1" >> /etc/resolv.conf
         
@@ -2420,13 +2585,13 @@ function enableWireguardIPV6OrIPV4(){
         sed -i 's/engage\.cloudflareclient\.com/162\.159\.192\.1/g' ${configWireGuardConfigFilePath}
         sed -i 's/\[2606\:4700\:d0\:\:a29f\:c001\]/162\.159\.192\.1/g' ${configWireGuardConfigFilePath}
         
-        sed -i 's/^DNS = 1\.1\.1\.1/DNS = 8\.8\.8\.8,1\.1\.1\.1,9\.9\.9\.10/g' ${configWireGuardConfigFilePath}
+        sed -i 's/^DNS = 1\.1\.1\.1/DNS = 8\.8\.8\.8,8\.8\.4\.4,1\.1\.1\.1,9\.9\.9\.10/g' ${configWireGuardConfigFilePath}
         sed -i 's/^DNS = 2620:fe\:\:10,2001\:4860\:4860\:\:8888,2606\:4700\:4700\:\:1111/DNS = 8\.8\.8\.8,1\.1\.1\.1,9\.9\.9\.10/g' ${configWireGuardConfigFilePath}
 
         echo "nameserver 8.8.8.8" >> /etc/resolv.conf
         echo "nameserver 8.8.4.4" >> /etc/resolv.conf
         echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-        echo "nameserver 9.9.9.9" >> /etc/resolv.conf
+        #echo "nameserver 9.9.9.9" >> /etc/resolv.conf
         echo "nameserver 9.9.9.10" >> /etc/resolv.conf
 
         echo
@@ -2543,11 +2708,11 @@ function removeWireguard(){
 
         echo
         if [[ $isWgcfAccountFileRemoveInput == [Yy] ]]; then
-            rm -rf ${configWgcfConfigFolderPath}
+            rm -rf "${configWgcfConfigFolderPath}"
             green " Wgcf申请的账号信息文件 ${configWgcfAccountFilePath} 已删除!"
             
         else
-            rm -f ${configWgcfProfileFilePath}
+            rm -f "${configWgcfProfileFilePath}"
             green " Wgcf申请的账号信息文件 ${configWgcfAccountFilePath} 已保留! "
         fi
         
@@ -2563,10 +2728,11 @@ function removeWireguard(){
 
         [ -d "/etc/wireguard" ] && ("rm -rf /etc/wireguard")
 
-        cp -f ${configWireGuardDNSBackupFilePath} /etc/resolv.conf
-
+        
         sleep 2
         modprobe -r wireguard
+
+        cp -f ${configWireGuardDNSBackupFilePath} /etc/resolv.conf
 
         green " ================================================== "
         green "  Wireguard 和 Cloudflare WARP 命令行工具 Wgcf 卸载完毕 !"
@@ -2926,7 +3092,7 @@ function start_menu(){
 
     if [[ ${configLanguage} == "cn" ]] ; then
     green " =================================================="
-    green " Linux 内核 一键安装脚本 | 2022-1-27 | By jinwyp | 系统支持：centos7+ / debian10+ / ubuntu16.04+"
+    green " Linux 内核 一键安装脚本 | 2022-7-09 | 系统支持：centos7+ / debian10+ / ubuntu16.04+"
     green " Linux 内核 4.9 以上都支持开启BBR, 如要开启BBR Plus 则需要安装支持BBR Plus的内核 "
     red " 在任何生产环境中请谨慎使用此脚本, 升级内核有风险, 请做好备份！在某些VPS会导致无法启动! "
     green " =================================================="
@@ -2955,38 +3121,42 @@ function start_menu(){
     green " 10. 查看 WireGuard 和 WARP SOCKS5 运行状态, 错误日志, 如果WireGuard启动失败 请选该项排查错误"
     echo
     green " 11. 安装官方 Cloudflare WARP Client 启动SOCKS5代理, 用于解锁 Netflix 限制"
-    green " 12. 安装 WireGuard 和 Cloudflare WARP 工具 Wgcf ${versionWgcf}, 启动 IPv4或IPv6, 用于避免弹出Google人机验证"
+    green " 12. 安装 WireGuard 和 Cloudflare WARP 工具 Wgcf, 启动 IPv4或IPv6, 用于避免弹出Google人机验证"
     green " 13. 同时安装 官方 Cloudflare WARP Client, WireGuard 和 命令行工具 Wgcf, 不推荐 "
     red " 14. 卸载 WireGuard 和 Cloudflare WARP linux client"
     green " 15. 切换 WireGuard 对VPS服务器的 IPv6 和 IPv4 的网络支持"
     green " 16. 设置 VPS 服务器 IPv4 还是 IPv6 网络优先访问"
     green " 21. 测试 VPS 是否支持 Netflix 非自制剧解锁 支持 WARP SOCKS5 测试 强烈推荐使用 "
+    green " 22. 自动刷新WARP IP 检测支持 Netflix 非自制剧解锁 "
     echo
 
     if [[ "${osRelease}" == "centos" ]]; then
-    green " 31. 安装 最新版本内核 5.16, 通过elrepo源安装"
+    green " 31. 安装 最新版本内核 5.17, 通过elrepo源安装"
     green " 32. 安装 LTS内核 5.4 LTS, 通过elrepo源安装"
     green " 33. 安装 内核 4.14 LTS, 从 altarch网站 下载安装"
     green " 34. 安装 内核 4.19 LTS, 从 altarch网站 下载安装"
     green " 35. 安装 内核 5.4 LTS, 从 elrepo网站 下载安装"
     echo
     green " 36. 安装 内核 5.10 LTS, Teddysun 编译 推荐安装此内核"
-    green " 37. 安装 内核 5.15, Teddysun 编译"
-    green " 38. 安装 内核 5.16, 下载安装. (安装最新版内核 可能会高于5.15) "
+    green " 37. 安装 内核 5.15 LTS, Teddysun 编译 推荐安装此内核"
+    green " 38. 安装 内核 5.17, 下载安装. (安装最新版内核 可能会高于5.17) "
 
     else
         if [[ "${osRelease}" == "debian" ]]; then
         green " 41. 安装 最新版本LTS内核 5.10 LTS, 通过 Debian 官方源安装"
+        green " 42. 安装 最新版本内核 5.16 或更高, 通过 Debian 官方源安装"
         echo
         fi
 
-    green " 42. 安装 最新版本内核 5.16, 通过 Ubuntu kernel mainline 安装"
-    green " 43. 安装 内核 4.19 LTS, 通过 Ubuntu kernel mainline 安装"
-    green " 44. 安装 内核 5.4 LTS, 通过 Ubuntu kernel mainline 安装"
-    green " 45. 安装 内核 5.10 LTS, 通过 Ubuntu kernel mainline 安装"
-    echo
-    green " 51. 安装 XanMod Kernel 内核 5.10 LTS, 官方源安装 "    
-    green " 52. 安装 XanMod Kernel 内核 5.14, 官方源安装 "   
+        green " 44. 安装 内核 4.19 LTS, 通过 Ubuntu kernel mainline 安装"
+        green " 45. 安装 内核 5.4 LTS, 通过 Ubuntu kernel mainline 安装"
+        green " 46. 安装 内核 5.10 LTS, 通过 Ubuntu kernel mainline 安装"
+        green " 47. 安装 内核 5.15, 通过 Ubuntu kernel mainline 安装"
+        green " 48. 安装 最新版本内核 5.17, 通过 Ubuntu kernel mainline 安装"
+
+        echo
+        green " 51. 安装 XanMod Kernel 内核 5.15 LTS, 官方源安装 "    
+        green " 52. 安装 XanMod Kernel 内核 5.17, 官方源安装 "   
 
     fi
 
@@ -2997,7 +3167,8 @@ function start_menu(){
     green " 64. 安装 BBR Plus 内核 4.19 LTS, UJX6N 编译"
     green " 65. 安装 BBR Plus 内核 5.4 LTS, UJX6N 编译"
     green " 66. 安装 BBR Plus 内核 5.10 LTS, UJX6N 编译" 
-    green " 67. 安装 BBR Plus 内核 5.14, UJX6N 编译"   
+    green " 67. 安装 BBR Plus 内核 5.15 LTS, UJX6N 编译" 
+    green " 68. 安装 BBR Plus 内核 5.17, UJX6N 编译"   
  
     echo
     green " 0. 退出脚本"
@@ -3006,7 +3177,7 @@ function start_menu(){
     else
 
     green " =================================================="
-    green " Linux kernel install script | 2022-1-27 | By jinwyp | OS support：centos7+ / debian10+ / ubuntu16.04+"
+    green " Linux kernel install script | 2022-7-09 | OS support：centos7+ / debian10+ / ubuntu16.04+"
     green " Enable bbr require linux kernel higher than 4.9. Enable bbr plus require special bbr plus kernel "
     red " Please use this script with caution in production. Backup your data first! Upgrade linux kernel will cause VPS unable to boot sometimes."
     green " =================================================="
@@ -3035,39 +3206,41 @@ function start_menu(){
     green " 10. Show WireGuard and WARP SOCKS5 working status, error log, etc."
     echo
     green " 11. Install official Cloudflare WARP linux client SOCKS5 proxy, in order to unlock Netflix geo restriction "
-    green " 12. Install WireGuard and Cloudflare WARP tool Wgcf ${versionWgcf}, enable IPv4 or IPv6, avoid Google reCAPTCHA"
+    green " 12. Install WireGuard and Cloudflare WARP tool Wgcf, enable IPv4 or IPv6, avoid Google reCAPTCHA"
     green " 13. Install official Cloudflare WARP linux client, WireGuard and WARP toll Wgcf, not recommended "
     red " 14. Remove WireGuard 和 Cloudflare WARP linux client"
     green " 15. Switch WireGuard using IPv6 or IPv4 for your VPS"
     green " 16. Set VPS using IPv4 or IPv6 firstly to access network"
     green " 21. Netflix region and non-self produced drama unlock test, support WARP SOCKS5 proxy and IPv6"
+    green " 22. Auto refresh Cloudflare WARP IP to unlock Netflix non-self produced drama"
     echo
 
     if [[ "${osRelease}" == "centos" ]]; then
-    green " 31. Install latest linux kernel, 5.16, from elrepo yum repository"
+    green " 31. Install latest linux kernel, 5.17, from elrepo yum repository"
     green " 32. Install LTS linux kernel, 5.4 LTS, from elrepo yum repository"
     green " 33. Install linux kernel 4.14 LTS, download and install from altarch website"
     green " 34. Install linux kernel 4.19 LTS, download and install from altarch website"
     green " 35. Install linux kernel 5.4 LTS, download and install from elrepo website"
     echo
     green " 36. Install linux kernel 5.10 LTS, compile by Teddysun. Recommended"
-    green " 37. Install linux kernel 5.15, compile by Teddysun."
-    green " 38. Install linux kernel 5.16, download and install (will install latest kernel, maybe higher than 5.16) "
+    green " 37. Install linux kernel 5.15 LTS, compile by Teddysun. Recommended"
+    green " 38. Install linux latest kernel 5.17 elrepo, download from Teddysun ftp"
 
     else
         if [[ "${osRelease}" == "debian" ]]; then
         green " 41. Install latest LTS linux kernel, 5.10 LTS, from Debian repository source"
+        green " 42. Install latest linux kernel, 5.16 or higher, from Debian repository source"
         echo
         fi
 
-    green " 42. Install latest linux kernel 5.16, download and install from Ubuntu kernel mainline"
-    green " 43. Install linux kernel 4.19 LTS, download and install from Ubuntu kernel mainline"
-    green " 44. Install linux kernel 5.4 LTS, download and install from Ubuntu kernel mainline"
-    green " 45. Install linux kernel 5.10 LTS, download and install from Ubuntu kernel mainline"
-    echo
-    green " 51. Install XanMod kernel 5.10 LTS, from XanMod repository source "    
-    green " 52. Install XanMod kernel 5.14, from XanMod repository source "   
-
+        green " 44. Install linux kernel 4.19 LTS, download and install from Ubuntu kernel mainline"
+        green " 45. Install linux kernel 5.4 LTS, download and install from Ubuntu kernel mainline"
+        green " 46. Install linux kernel 5.10 LTS, download and install from Ubuntu kernel mainline"
+        green " 47. Install linux kernel 5.15, download and install from Ubuntu kernel mainline"
+        green " 48. Install latest linux kernel 5.17, download and install from Ubuntu kernel mainline"
+        echo
+        green " 51. Install XanMod kernel 5.15 LTS, from XanMod repository source "    
+        green " 52. Install XanMod kernel 5.17, from XanMod repository source "  
     fi
 
     echo
@@ -3077,7 +3250,8 @@ function start_menu(){
     green " 64. Install BBR Plus kernel 4.19 LTS, compile by UJX6N"
     green " 65. Install BBR Plus kernel 5.4 LTS, compile by UJX6N"
     green " 66. Install BBR Plus kernel 5.10 LTS, compile by UJX6N" 
-    green " 67. Install BBR Plus kernel 5.14, compile by UJX6N"   
+    green " 67. Install BBR Plus kernel 5.15 LTS, compile by UJX6N" 
+    green " 68. Install BBR Plus kernel 5.17, compile by UJX6N"   
  
     echo
     green " 0. exit"
@@ -3144,8 +3318,11 @@ function start_menu(){
         21 )
            vps_netflix_jin
         ;;
+        22 )
+           vps_netflix_jin_auto
+        ;;
         31 )
-            linuxKernelToInstallVersion="5.16"
+            linuxKernelToInstallVersion="5.17"
             isInstallFromRepo="yes"
             installKernel
         ;;
@@ -3175,7 +3352,7 @@ function start_menu(){
             installKernel
         ;; 
         38 )
-            linuxKernelToInstallVersion="5.16"
+            linuxKernelToInstallVersion="5.17"
             installKernel
         ;;
         41 )
@@ -3184,29 +3361,43 @@ function start_menu(){
             installKernel
         ;;
         42 )
-            linuxKernelToInstallVersion="5.16.7"
+            linuxKernelToInstallVersion="5.16"
+            isInstallFromRepo="yes"
             installKernel
-        ;;
-        43 ) 
+        ;;        
+        43 )
+            linuxKernelToInstallVersion="4.19"
+            isInstallFromRepo="yes"
+            installKernel
+        ;;        
+        44 ) 
             linuxKernelToInstallVersion="4.19"
             installKernel
         ;;
-        44 )
+        45 )
             linuxKernelToInstallVersion="5.4"
             installKernel
         ;;
-        45 )
-            linuxKernelToInstallVersion="5.10.72"
+        46 )
+            linuxKernelToInstallVersion="5.10.118"
             installKernel
         ;;
+        47 )
+            linuxKernelToInstallVersion="5.15"
+            installKernel
+        ;;
+        48 )
+            linuxKernelToInstallVersion="5.17"
+            installKernel
+        ;;        
         51 )
-            linuxKernelToInstallVersion="5.10"
+            linuxKernelToInstallVersion="5.15"
             linuxKernelToBBRType="xanmod"
             isInstallFromRepo="yes"
             installKernel
         ;;
         52 )
-            linuxKernelToInstallVersion="5.14"
+            linuxKernelToInstallVersion="5.17"
             linuxKernelToBBRType="xanmod"
             isInstallFromRepo="yes"
             installKernel
@@ -3242,12 +3433,22 @@ function start_menu(){
             installKernel
         ;;
         67 )
-            linuxKernelToInstallVersion="5.14"
+            linuxKernelToInstallVersion="5.15"
             linuxKernelToBBRType="bbrplus"
             installKernel
         ;;
-        88 )
+        68 )
+            linuxKernelToInstallVersion="5.17"
+            linuxKernelToBBRType="bbrplus"
+            installKernel
+        ;;
+        87 )
             getLatestUbuntuKernelVersion
+            getLatestCentosKernelVersion
+            getLatestCentosKernelVersion "manual"
+        ;;
+        88 )
+            upgradeScript
         ;;
 
         0 )
