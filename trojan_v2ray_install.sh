@@ -626,12 +626,18 @@ function installPackage(){
 
 
         # https://www.cyberciti.biz/faq/how-to-install-and-use-nginx-on-centos-8/
-        if  [[ ${osReleaseVersionNoShort} == "8" || ${osReleaseVersionNoShort} == "9" ]]; then
+        if  [[ ${osReleaseVersionNoShort} == "8" ]]; then
             ${sudoCmd} yum module -y reset nginx
             ${sudoCmd} yum module -y enable nginx:1.20
             ${sudoCmd} yum module list nginx
         fi
 
+        if  [[  ${osReleaseVersionNoShort} == "9" ]]; then
+            ${sudoCmd} yum module -y reset nginx
+            ${sudoCmd} yum module -y enable nginx:1.22
+            ${sudoCmd} yum module list nginx
+        fi
+        
     elif [ "$osRelease" == "ubuntu" ]; then
         
         # https://joshtronic.com/2018/12/17/how-to-install-the-latest-nginx-on-debian-and-ubuntu/
@@ -1055,7 +1061,7 @@ downloadFilenameTrojanGo="trojan-go-linux-amd64.zip"
 versionV2ray="4.45.2"
 downloadFilenameV2ray="v2ray-linux-64.zip"
 
-versionXray="1.5.5"
+versionXray="1.6.6-2"
 downloadFilenameXray="Xray-linux-64.zip"
 
 versionTrojanWeb="2.10.5"
@@ -1196,7 +1202,7 @@ function getV2rayVersion(){
     fi
 
     if [[ $1 == "xray" ]] ; then
-        versionXray=$(getGithubLatestReleaseVersion "XTLS/Xray-core")
+        #versionXray=$(getGithubLatestReleaseVersion "XTLS/Xray-core")
         echo "versionXray: ${versionXray}"
     fi
 
