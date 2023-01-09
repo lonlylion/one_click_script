@@ -879,7 +879,7 @@ function vps_netflix_jin(){
 
 
 function vps_netflixgo(){
-    wget -qN --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/v3.1.0/nf_linux_amd64 && chmod +x ./netflixGo && ./netflixGo
+    wget -qN --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/v3.1.0-1/nf_linux_amd64 && chmod +x ./netflixGo && ./netflixGo
     # wget -qN --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/2.61/nf_2.61_linux_amd64 && chmod +x ./netflixGo && ./netflixGo -method full
     echo
     echo
@@ -1061,7 +1061,7 @@ downloadFilenameTrojanGo="trojan-go-linux-amd64.zip"
 versionV2ray="4.45.2"
 downloadFilenameV2ray="v2ray-linux-64.zip"
 
-versionXray="1.6.6-2"
+versionXray="1.7.0"
 downloadFilenameXray="Xray-linux-64.zip"
 
 versionTrojanWeb="2.10.5"
@@ -1202,7 +1202,7 @@ function getV2rayVersion(){
     fi
 
     if [[ $1 == "xray" ]] ; then
-        #versionXray=$(getGithubLatestReleaseVersion "XTLS/Xray-core")
+        versionXray=$(getGithubLatestReleaseVersion "XTLS/Xray-core")
         echo "versionXray: ${versionXray}"
     fi
 
@@ -2425,7 +2425,7 @@ function installTrojanV2rayWithNginx(){
 
     stopServiceNginx
     testLinuxPortUsage
-    installPackage
+    # installPackage
 
     echo
     if [ "$1" = "v2ray" ]; then

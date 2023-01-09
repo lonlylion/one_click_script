@@ -2110,7 +2110,10 @@ function installWARPGO(){
     # wget -qN --no-check-certificate -O ./nf.sh https://raw.githubusercontent.com/jinwyp/SimpleNetflix/dev/nf.sh && chmod +x ./nf.sh
 	wget -qN --no-check-certificate -O ./warp-go.sh https://raw.githubusercontent.com/fscarmen/warp/main/warp-go.sh && chmod +x ./warp-go.sh && ./warp-go.sh
 }
-
+function vps_netflix_auto(){
+    # wget -qN --no-check-certificate -O ./nf.sh https://raw.githubusercontent.com/jinwyp/SimpleNetflix/dev/nf.sh && chmod +x ./nf.sh
+	bash <(curl -sSL https://raw.githubusercontent.com/fscarmen/warp_unlock/main/unlock.sh)
+}
 
 function vps_netflix_jin(){
     # wget -qN --no-check-certificate -O ./nf.sh https://raw.githubusercontent.com/jinwyp/SimpleNetflix/dev/nf.sh && chmod +x ./nf.sh
@@ -3171,19 +3174,19 @@ function start_menu(){
     green " 16. 设置 VPS 服务器 IPv4 还是 IPv6 网络优先访问"
 
     green " 21. 安装 warp-go 脚本 by fscarmen"
-    green " 22. 测试 VPS 是否支持 Netflix 非自制剧解锁 支持 WARP SOCKS5 测试 强烈推荐使用 "
-    green " 23. 自动刷新WARP IP 直到支持 Netflix 非自制剧解锁 "
+    # green " 22. 测试 VPS 是否支持 Netflix 非自制剧解锁 支持 WARP SOCKS5 测试 强烈推荐使用 "
+    green " 22. 自动刷新WARP IP 直到支持 Netflix 非自制剧解锁 "
     echo
 
     if [[ "${osRelease}" == "centos" ]]; then
-    green " 31. 安装 最新版本内核 6.0, 通过elrepo源安装"
+    green " 31. 安装 最新版本内核 6.1, 通过elrepo源安装"
     green " 32. 安装 LTS内核 5.4 LTS, 通过elrepo源安装"
     green " 33. 安装 内核 4.14 LTS, 从 altarch网站 下载安装"
     green " 34. 安装 内核 4.19 LTS, 从 altarch网站 下载安装"
     green " 35. 安装 内核 5.4 LTS, 从 elrepo网站 下载安装"
     echo
-    green " 36. 安装 内核 5.10 LTS, Teddysun 编译 推荐安装此内核"
-    green " 37. 安装 内核 5.15 LTS, Teddysun 编译 推荐安装此内核"
+    green " 36. 安装 内核 5.10 LTS, Teddysun 编译 推荐安装"
+    green " 37. 安装 内核 5.15 LTS, Teddysun 编译 推荐安装"
     green " 38. 安装 内核 5.19, Teddysun 编译 下载安装. "
     green " 39. 安装 内核 6.1, elrepo 官方编译. "
 
@@ -3259,12 +3262,11 @@ function start_menu(){
     green " 16. Set VPS using IPv4 or IPv6 firstly to access network"
 
     green " 21. Install warp-go by fscarmen. Enable IPv6, avoid Google reCAPTCHA and unlock Netflix geo restriction "
-    green " 22. Netflix region and non-self produced drama unlock test, support WARP SOCKS5 proxy and IPv6"
-    green " 23. Auto refresh Cloudflare WARP IP to unlock Netflix non-self produced drama"
+    green " 22. Auto refresh Cloudflare WARP IP to unlock Netflix non-self produced drama"
     echo
 
     if [[ "${osRelease}" == "centos" ]]; then
-    green " 31. Install latest linux kernel, 6.0, from elrepo yum repository"
+    green " 31. Install latest linux kernel, 6.1, from elrepo yum repository"
     green " 32. Install LTS linux kernel, 5.4 LTS, from elrepo yum repository"
     green " 33. Install linux kernel 4.14 LTS, download and install from altarch website"
     green " 34. Install linux kernel 4.19 LTS, download and install from altarch website"
@@ -3272,8 +3274,8 @@ function start_menu(){
     echo
     green " 36. Install linux kernel 5.10 LTS, compile by Teddysun. Recommended"
     green " 37. Install linux kernel 5.15 LTS, compile by Teddysun. Recommended"
-    green " 38. Install linux latest kernel 5.19 compile by Teddysun. download from Teddysun ftp"
-
+    green " 38. Install linux kernel 5.19 compile by Teddysun. download from Teddysun ftp"
+    green " 39. Install linux kernel 6.1, compile by elrepo "
     else
         if [[ "${osRelease}" == "debian" ]]; then
         green " 41. Install latest LTS linux kernel, 5.10 LTS, from Debian repository source"
@@ -3365,11 +3367,14 @@ function start_menu(){
         ;;
         21 )
            installWARPGO
-        ;;       
+        ;;
         22 )
-           vps_netflix_jin
+           vps_netflix_auto
         ;;
         23 )
+           vps_netflix_jin
+        ;;
+        24 )
            vps_netflix_jin_auto
         ;;
         31 )
