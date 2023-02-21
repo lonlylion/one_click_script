@@ -1203,7 +1203,7 @@ function getV2rayVersion(){
         echo
         green " ================================================== "
         green " 请选择 V2ray 的版本, 默认直接回车为 稳定版4.45.2 (推荐)"
-        green " 选否则安装最新版的 V2ray 5.1.0 User Preview"
+        green " 选否则安装最新版的 V2ray 5.3.0 User Preview"
         echo
         read -r -p "是否安装稳定版V2ray? 默认直接回车为稳定版4.45.2, 请输入[Y/n]:" isInstallXrayVersionInput
         isInstallXrayVersionInput=${isInstallXrayVersionInput:-Y}
@@ -1680,6 +1680,24 @@ function compareRealIpWithLocalIp(){
 
 function getHTTPSCertificateStep1(){
     
+    echo
+    green " ================================================== "
+    green " 请输入证书要放置的路径:  默认为${configSSLCertPath} "
+    yellow " 自定义证书路径可能会导致安装失败 仅供高手使用 "
+    yellow " 自定义证书路径需要预先创建好, 否则会使用默认路径${configSSLCertPath} "
+    echo
+    read -r -p "请输入证书路径 默认直接回车为${configSSLCertPath}" configSSLFilePath
+    configSSLFilePath=${configSSLFilePath:-${configSSLCertPath}}
+    if [ -z "${configSSLFilePath}" ]; then
+        configSSLFilePath="${configSSLCertPath}"
+        red " 输入的自定义证书路径为空, 将使用默认路径${configSSLCertPath} "
+    fi
+    if [ ! -d "${configSSLFilePath}" ]; then
+        configSSLFilePath="${configSSLCertPath}"
+        red " 输入的自定义证书路径为不存在, 将使用默认路径${configSSLCertPath} "
+    fi
+    configSSLCertPath="${configSSLFilePath}"
+
     echo
     green " ================================================== "
     yellow " 请输入解析到本VPS的域名 例如 www.xxx.com: (此步骤请关闭CDN后和nginx后安装 避免80端口占用导致申请证书失败)"
@@ -2243,6 +2261,8 @@ EOF
 
 function removeNginx(){
 
+    green " ================================================== "
+    green " Are you sure to remove Nginx ? "
     echo
     read -r -p "是否确认卸载Nginx? 直接回车默认卸载, 请输入[Y/n]:" isRemoveNginxServerInput
     isRemoveNginxServerInput=${isRemoveNginxServerInput:-Y}
@@ -2342,7 +2362,7 @@ configNginxSNIDomainWebsite=""
 configNginxSNIDomainV2ray=""
 configNginxSNIDomainTrojan=""
 
-configSSLCertPath="${configWebsiteFatherPath}/cert"
+
 configNginxSNIDomainTrojanCertPath="${configWebsiteFatherPath}/cert/nginxsni/trojan"
 configNginxSNIDomainV2rayCertPath="${configWebsiteFatherPath}/cert/nginxsni/v2ray"
 configNginxSNIDomainWebsiteCertPath="${configWebsiteFatherPath}/cert/nginxsni/web"
@@ -2657,7 +2677,7 @@ function getTrojanGoVersion(){
 
     else
         #versionTrojanGo=$(getGithubLatestReleaseVersion "Potterli20/trojan-go-fork")
-        versionTrojanGo="V2023.01.30"
+        versionTrojanGo="V2023.02.15"
         echo "versionTrojanGo: ${versionTrojanGo}"
         configTrojanBaseVersion=${versionTrojanGo}
         configTrojanBasePath="${configTrojanGoPath}"
@@ -2702,7 +2722,11 @@ function downloadTrojanBin(){
         if [[ ${osArchitecture} == "arm64" ]] ; then
             downloadFilenameTrojanGo="trojan-go-fork-linux-armv8.zip"
         fi
-        # https://github.com/Potterli20/trojan-go-fork/releases/download/V2022.10.17/trojan-go-fork-linux-amd64.zip
+
+        # https://github.com/Potterli20/trojan-go-fork/releases/download/V2023.02.15/trojan-go-fork-linux-arm.zip
+        # https://github.com/Potterli20/trojan-go-fork/releases/download/V2023.02.15/trojan-go-fork-linux-armv8.zip
+        # https://github.com/Potterli20/trojan-go-fork/releases/download/V2023.02.15/trojan-go-fork-linux-amd64.zip
+        
         downloadAndUnzip "https://github.com/Potterli20/trojan-go-fork/releases/download/${versionTrojanGo}/${downloadFilenameTrojanGo}" "${configTrojanBasePath}" "${downloadFilenameTrojanGo}"
         mv -f ${configTrojanBasePath}/trojan-go-fork ${configTrojanBasePath}/trojan-go
     fi
@@ -2753,8 +2777,8 @@ function installTrojanServer(){
     green " 3 修改版 Trojan-go 支持 websocket by fregie (support websocket)"
     green " 4 修改版 Trojan-go 支持模拟浏览器指纹 支持 websocket by Potterli20 (support websocket)"
     echo
-    read -r -p "请选择哪种 Trojan ? 直接回车默认选4, 请输入纯数字:" isTrojanTypeInput
-    isTrojanTypeInput=${isTrojanTypeInput:-4}
+    read -r -p "请选择哪种 Trojan ? 直接回车默认选3, 请输入纯数字:" isTrojanTypeInput
+    isTrojanTypeInput=${isTrojanTypeInput:-3}
 
     if [[ "${isTrojanTypeInput}" == "1" ]]; then
         trojanInstallType="1"
@@ -3274,12 +3298,12 @@ function removeTrojan(){
     else
         red " 系统没有安装 Trojan / Trojan-go, 退出卸载"
         red " Trojan or Trojan-go not install, exit"
-        exit
     fi
 
     echo
     green " ================================================== "
     green " Are you sure to uninstall Trojan${promptInfoTrojanName} ? "
+    echo
     read -r -p "是否确认卸载 Trojan${promptInfoTrojanName}? 直接回车默认卸载, 请输入[Y/n]:" isRemoveTrojanServerInput
     isRemoveTrojanServerInput=${isRemoveTrojanServerInput:-Y}
 
@@ -6692,6 +6716,8 @@ EOF
 
 function removeV2ray(){
 
+    green " ================================================== "
+    green " Are you sure to remove V2ray or Xray ? "
     echo
     read -r -p "是否确认卸载 V2ray 或 Xray? 直接回车默认卸载, 请输入[Y/n]:" isRemoveV2rayServerInput
     isRemoveV2rayServerInput=${isRemoveV2rayServerInput:-Y}
@@ -8187,7 +8213,7 @@ function start_menu(){
     if [[ ${configLanguage} == "cn" ]] ; then
 
     green " ===================================================================================================="
-    green " Trojan-go V2ray Xray 一键安装脚本 | 2022-10-23 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
+    green " Trojan-go V2ray Xray 一键安装脚本 | 2023-2-06 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
     green " ===================================================================================================="
     green " 1. 安装linux内核 bbr plus, 安装WireGuard, 用于解锁 Netflix 限制和避免弹出 Google reCAPTCHA 人机验证"
     echo
@@ -8237,7 +8263,7 @@ function start_menu(){
 
 
     green " ===================================================================================================="
-    green " Trojan-go V2ray Xray Installation | 2022-10-23 | OS support: centos7+ / debian9+ / ubuntu16.04+"
+    green " Trojan-go V2ray Xray Installation | 2023-2-06 | OS support: centos7+ / debian9+ / ubuntu16.04+"
     green " ===================================================================================================="
     green " 1. Install linux kernel,  bbr plus kernel, WireGuard and Cloudflare WARP. Unlock Netflix geo restriction and avoid Google reCAPTCHA"
     echo
