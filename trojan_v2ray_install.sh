@@ -809,7 +809,7 @@ function installSoftOhMyZsh(){
         zshConfig=${HOME}/.zshrc
         zshTheme="maran"
         sed -i 's/ZSH_THEME=.*/ZSH_THEME="'"${zshTheme}"'"/' $zshConfig
-        sed -i 's/plugins=(git)/plugins=(git cp history z rsync colorize nvm zsh-autosuggestions)/' $zshConfig
+        sed -i 's/plugins=(git)/plugins=(git cp history z rsync colorize zsh-autosuggestions)/' $zshConfig
 
         zshAutosuggestionsConfig=${HOME}/.oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
         sed -i "s/ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'/ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=1'/" $zshAutosuggestionsConfig
@@ -5001,34 +5001,41 @@ function v2rayRouteRule(){
 
     fi
 
-    echo
-    green " =================================================="
-    yellow " 请选择 解锁更多的流媒体和视频网站的方式"
-    echo
-    green " 1. 不使用解锁"
-    green " 2. 使用 IPv6 解锁, 需要配合安装WARP 推荐使用"
-    green " 3. 使用 WARP Sock5 代理解锁"
-    green " 4. 通过转发到可解锁的v2ray或xray服务器解锁"
-    echo
-    read -r -p "请输入? 直接回车默认选1 不解锁, 请输入纯数字:" isV2rayUnlockWarpModeInput
-    isV2rayUnlockWarpModeInput=${isV2rayUnlockWarpModeInput:-1}
 
-    if [[ $isV2rayUnlockWarpModeInput == "2" ]]; then
-        V2rayUnlockSiteRuleV6Text+=", ${V2rayUnlockVideoSiteRuleText}"
+    if [[ $isV2rayUnlockVideoSiteInput != "1" ]]; then
+
+        echo
+        green " =================================================="
+        yellow " 请选择 解锁更多的流媒体和视频网站的方式"
+        echo
+        green " 1. 不使用解锁"
+        green " 2. 使用 IPv6 解锁, 需要配合安装WARP 推荐使用"
+        green " 3. 使用 WARP Sock5 代理解锁"
+        green " 4. 通过转发到可解锁的v2ray或xray服务器解锁"
+        echo
+        read -r -p "请输入? 直接回车默认选1 不解锁, 请输入纯数字:" isV2rayUnlockWarpModeInput
+        isV2rayUnlockWarpModeInput=${isV2rayUnlockWarpModeInput:-1}
+
+        if [[ $isV2rayUnlockWarpModeInput == "2" ]]; then
+            V2rayUnlockSiteRuleV6Text+=", ${V2rayUnlockVideoSiteRuleText}"
 
 
-    elif [[ $isV2rayUnlockWarpModeInput == "3" ]]; then
-        V2rayUnlockSiteRuleSock5Text+=", ${V2rayUnlockVideoSiteRuleText}"
+        elif [[ $isV2rayUnlockWarpModeInput == "3" ]]; then
+            V2rayUnlockSiteRuleSock5Text+=", ${V2rayUnlockVideoSiteRuleText}"
 
-        inputUnlockWARPSock5Server
+            inputUnlockWARPSock5Server
 
-    elif [[ $isV2rayUnlockWarpModeInput == "4" ]]; then
-        V2rayUnlockSiteRuleV2rayServerText+=", ${V2rayUnlockVideoSiteRuleText}"
+        elif [[ $isV2rayUnlockWarpModeInput == "4" ]]; then
+            V2rayUnlockSiteRuleV2rayServerText+=", ${V2rayUnlockVideoSiteRuleText}"
 
-        inputUnlockV2rayServerInfo
-    else
-        echo ""
+            inputUnlockV2rayServerInfo
+        else
+            echo ""
+        fi
+
     fi
+
+
 
 
 
@@ -9102,18 +9109,18 @@ function setLanguage(){
     echo
     green " =================================================="
     green " Please choose your language"
-    green " 1. 中文"
-    green " 2. English"  
+    green " 1. English"
+    green " 2. 中文"  
     echo
-    read -p "Please input your language:" languageInput
+    read -r -p "Please input your language:" languageInput
     
     case "${languageInput}" in
         1 )
-            echo "cn" > ${configLanguageFilePath}
+            echo "en" > ${configLanguageFilePath}
             showMenu
         ;;
         2 )
-            echo "en" > ${configLanguageFilePath}
+            echo "cn" > ${configLanguageFilePath}
             showMenu
         ;;
         * )
@@ -9121,7 +9128,6 @@ function setLanguage(){
             setLanguage
         ;;
     esac
-
 }
 
 configLanguageFilePath="${HOME}/language_setting_v2ray_trojan.md"

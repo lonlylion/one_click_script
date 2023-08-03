@@ -69,17 +69,15 @@ function showInfoGreen(){
 
 
 function promptContinueOpeartion(){
-	read -p "是否继续操作? 直接回车默认继续操作, 请输入[Y/n]:" isContinueInput
+	read -r -p "是否继续操作? 直接回车默认继续操作, 请输入[Y/n]:" isContinueInput
 	isContinueInput=${isContinueInput:-Y}
 
 	if [[ $isContinueInput == [Yy] ]]; then
 		echo ""
 	else 
-		exit
+		exit 1
 	fi
 }
-
-
 
 
 
@@ -220,19 +218,40 @@ function getLinuxOSRelease(){
 }
 
 
+configLocalVPSIp="$(curl https://ipv4.icanhazip.com/)"
+function getVPSIPInput (){
+    echo
+    read -r -p "请输入VPS的IP地址:" currentVPSIPaddressInput
 
+    if [[ -n "${currentVPSIPaddressInput}" ]]; then
+        configLocalVPSIp="${currentVPSIPaddressInput}"
+    else
+        red "输入的IP地址无效 请重新输入. Invalid IP address, pls input again."
 
+        getVPSIPInput
+    fi
 
-function promptContinueOpeartion(){
-	read -r -p "是否继续操作? 直接回车默认继续操作, 请输入[Y/n]:" isContinueInput
-	isContinueInput=${isContinueInput:-Y}
-
-	if [[ $isContinueInput == [Yy] ]]; then
-		echo ""
-	else 
-		exit 1
-	fi
 }
+function getVPSIP(){
+    configLocalVPSIp="$(curl https://ipv4.icanhazip.com/)"
+
+    echo
+    green "当前VPS的IP为: ${configLocalVPSIp}"
+    green "The current IP address of the VPS is: ${configLocalVPSIp}"
+    echo
+    green "如果本机IPv4 不是 ${configLocalVPSIp}, 请手动输入正确的IP "
+    green "If VPS IP is not ${configLocalVPSIp}, pls input the IP manually"
+    echo
+    read -r -p "是否手动输入IP 默认否, 请输入[y/N]:" isChangeVPSIPInput
+    
+    if [[ $isChangeVPSIPInput == [yY] ]]; then
+        getVPSIPInput
+    fi
+    echo
+}
+
+
+
 
 osPort80=""
 osPort443=""
@@ -942,15 +961,37 @@ function installDocker(){
     else
 
         if [[ "${osInfo}" == "AlmaLinux" ]]; then
+            echo " dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin"
             ${sudoCmd} yum module remove container-tools
+            ${sudoCmd} dnf upgrade
+
             # https://linuxconfig.org/install-docker-on-almalinux
             ${sudoCmd} dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
             ${sudoCmd} dnf remove -y podman buildah 
-            ${sudoCmd} dnf install -y docker-ce docker-ce-cli containerd.io
- 
+            ${sudoCmd} dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+        elif [[ "$osRelease" == "debian" ]]; then
+            for pkg in docker.io docker-doc docker-compose podman-docker containerd runc; 
+            do 
+                ${sudoCmd} apt-get remove $pkg;
+            done
+
+            ${sudoCmd} apt-get update
+            ${sudoCmd} apt-get install -y ca-certificates curl gnupg
+            ${sudoCmd} install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            ${sudoCmd} chmod a+r /etc/apt/keyrings/docker.gpg
+
+            echo \
+            "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian \
+            ${osReleaseVersionCodeName} stable" | \
+            sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            ${sudoCmd} apt-get update
+            ${sudoCmd} apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
         else
-            # curl -fsSL https://get.docker.com -o get-docker.sh  
-            curl -sSL https://get.daocloud.io/docker -o ${configDockerDownloadPath}/get-docker.sh  
+            curl -fsSL https://get.docker.com -o ${configDockerDownloadPath}/get-docker.sh
+            # curl -sSL https://get.daocloud.io/docker -o ${configDockerDownloadPath}/get-docker.sh  
             chmod +x ${configDockerDownloadPath}/get-docker.sh
             ${configDockerDownloadPath}/get-docker.sh
 
@@ -958,7 +999,8 @@ function installDocker(){
         ${sudoCmd}
         ${sudoCmd} systemctl start docker.service
         ${sudoCmd} systemctl enable docker.service
-        
+        ${sudoCmd} systemctl restart docker.service
+
         showHeaderGreen "Docker installed successfully !"
         docker version
         echo
@@ -972,8 +1014,8 @@ function installDocker(){
         versionDockerCompose=$(getGithubLatestReleaseVersion "docker/compose")
 
         # dockerComposeUrl="https://github.com/docker/compose/releases/download/v${versionDockerCompose}/docker-compose-$(uname -s)-$(uname -m)"
-        dockerComposeUrl="https://github.com/docker/compose/releases/download/v2.9.0/docker-compose-linux-x86_64"
-        dockerComposeUrl="https://get.daocloud.io/docker/compose/releases/download/v${versionDockerCompose}/docker-compose-linux-x86_64"
+        dockerComposeUrl="https://github.com/docker/compose/releases/download/v${versionDockerCompose}/docker-compose-linux-x86_64"
+        #dockerComposeUrl="https://get.daocloud.io/docker/compose/releases/download/v${versionDockerCompose}/docker-compose-linux-x86_64"
         
         showInfoGreen "Downloading  ${dockerComposeUrl}"
 
@@ -1005,15 +1047,18 @@ function removeDocker(){
     if [ "$osRelease" == "centos" ] ; then
 
         sudo yum remove docker docker-common container-selinux docker-selinux docker-engine
+        sudo yum remove docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
     else 
-        sudo apt-get remove docker docker-engine
-
+        sudo apt-get remove -y docker docker-engine
+        sudo apt-get remove -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+    
     fi
 
     rm -rf /var/lib/docker/
 
     rm -f "$(which dc)" 
+    rm -f "/usr/bin/docker"
     rm -f "/usr/bin/docker-compose"
     rm -f "/usr/local/bin/docker-compose"
     rm -f "${DOCKER_CONFIG}/cli-plugins/docker-compose"
@@ -1605,7 +1650,7 @@ function installAlist(){
     green " 1. 安装 Alist "
     green " 2. 安装 Alist + Nginx (需要域名 并已解析到本机IP)"
     green " 3. 更新 Alist"  
-    red " 4. 删除 Alist"     
+    red " 4. 卸载 Alist"     
     echo
     read -r -p "请输入纯数字, 默认为安装:" languageInput
     
@@ -1613,14 +1658,14 @@ function installAlist(){
 
     case "${languageInput}" in
         1 )
-            curl -fsSL "https://nn.ci/alist.sh" | bash -s install
-            sed -i "/^\[Service\]/a \User=www-data" ${configAlistSystemdServicePath}
+            curl -fsSL "https://alist.nn.ci/v3.sh" | bash -s install
+            # sed -i "/^\[Service\]/a \User=www-data" ${configAlistSystemdServicePath}
             ${sudoCmd} systemctl daemon-reload
             ${sudoCmd} systemctl restart alist       
         ;;
         2 )
-            curl -fsSL "https://nn.ci/alist.sh" | bash -s install
-            sed -i "/^\[Service\]/a \User=www-data" ${configAlistSystemdServicePath}
+            curl -fsSL "https://alist.nn.ci/v3.sh" | bash -s install
+            # sed -i "/^\[Service\]/a \User=www-data" ${configAlistSystemdServicePath}
             ${sudoCmd} systemctl daemon-reload
             ${sudoCmd} systemctl restart alist    
 
@@ -1638,12 +1683,12 @@ function installAlist(){
                 configInstallNginxMode="alist"
                 installWebServerNginx
             fi
-        ;;        
+        ;;
         3 )
-            curl -fsSL "https://nn.ci/alist.sh" | bash -s update
+            curl -fsSL "https://alist.nn.ci/v3.sh" | bash -s update
         ;;
         4 )
-            curl -fsSL "https://nn.ci/alist.sh" | bash -s uninstall
+            curl -fsSL "https://alist.nn.ci/v3.sh" | bash -s uninstall
         ;;
         * )
             exit
@@ -1741,15 +1786,16 @@ function installCloudreve(){
     green "   Prepare to install Cloudreve ${versionCloudreve}"
     green " ================================================== "
 
-
+    getVPSIP
+    
     mkdir -p ${configCloudreveDownloadCodeFolder}
     mkdir -p ${configCloudreveCommandFolder}
     cd ${configCloudrevePath}
 
 
-    # https://github.com/cloudreve/Cloudreve/releases/download/3.5.3/cloudreve_3.5.3_linux_amd64.tar.gz
-    # https://github.com/cloudreve/Cloudreve/releases/download/3.4.2/cloudreve_3.4.2_linux_arm.tar.gz
-    # https://github.com/cloudreve/Cloudreve/releases/download/3.4.2/cloudreve_3.4.2_linux_arm64.tar.gz
+    # https://github.com/cloudreve/Cloudreve/releases/download/3.8.1/cloudreve_3.8.1_linux_amd64.tar.gz
+    # https://github.com/cloudreve/Cloudreve/releases/download/3.4.2/cloudreve_3.8.1_linux_arm.tar.gz
+    # https://github.com/cloudreve/Cloudreve/releases/download/3.4.2/cloudreve_3.8.1_linux_arm64.tar.gz
     
 
     downloadFilenameCloudreve="cloudreve_${versionCloudreve}_linux_amd64.tar.gz"
@@ -1769,10 +1815,12 @@ function installCloudreve(){
     cd ${configCloudreveCommandFolder}
     echo "nohup ${configCloudreveCommandFolder}/cloudreve > ${configCloudreveReadme} 2>&1 &"
     nohup ${configCloudreveCommandFolder}/cloudreve > ${configCloudreveReadme} 2>&1 &
-    sleep 3
+    sleep 10
     pidCloudreve=$(ps -ef | grep cloudreve | grep -v grep | awk '{print $2}')
     echo "kill -9 ${pidCloudreve}"
     kill -9 ${pidCloudreve}
+    echo
+    sleep 3
     echo
 
     ${sudoCmd} chown -R ${wwwUsername}:${wwwUsername} ${configCloudrevePath}
@@ -1780,6 +1828,7 @@ function installCloudreve(){
 
 
     cat > ${osSystemMdPath}cloudreve.service <<-EOF
+
 [Unit]
 Description=Cloudreve
 Documentation=https://docs.cloudreve.org
@@ -1787,7 +1836,7 @@ After=network.target
 Wants=network.target
 
 [Service]
-User=${wwwUsername}
+# User=${wwwUsername}
 WorkingDirectory=${configCloudreveCommandFolder}
 ExecStart=${configCloudreveCommandFolder}/cloudreve -c ${configCloudreveIni}
 Restart=on-abnormal
@@ -1799,6 +1848,7 @@ StandardError=syslog
 
 [Install]
 WantedBy=multi-user.target
+
 EOF
 
     echo
@@ -1810,16 +1860,10 @@ EOF
     systemctl start cloudreve
     systemctl enable cloudreve
 
-    ${configCloudreveCommandFolder}/cloudreve -eject
-
-    ${sudoCmd} chown -R ${wwwUsername}:${wwwUsername} ${configCloudrevePath}
-    ${sudoCmd} chmod -R 775 ${configCloudrevePath}
-
-
     echo
     green " ================================================== "
-    green " Cloudreve Installed ! Working port: ${configCloudrevePort}"
-    green " Please visit http://your ip:${configCloudrevePort}"
+    green " Cloudreve Installed successfully! "
+    green " Visit http://${configLocalVPSIp}:${configCloudrevePort}"
     green " 如无法访问, 请设置Firewall防火墙规则 放行 ${configCloudrevePort} 端口"
     green " 查看运行状态命令: systemctl status cloudreve  重启: systemctl restart cloudreve "
     green " Cloudreve INI 配置文件路径: ${configCloudreveIni}"
@@ -1837,6 +1881,11 @@ EOF
     isNginxInstallInput=${isNginxInstallInput:-Y}
 
     if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        # ${configCloudreveCommandFolder}/cloudreve -eject
+
+        # ${sudoCmd} chown -R ${wwwUsername}:${wwwUsername} ${configCloudrevePath}
+        # ${sudoCmd} chmod -R 775 ${configCloudrevePath}
+
         isInstallNginx="true"
         configSSLCertPath="${configSSLCertPath}/cloudreve"
         getHTTPSCertificateStep1
@@ -2113,9 +2162,9 @@ EOF
 EOF
 
     elif [[ "${configInstallNginxMode}" == "cloudreve" ]]; then
-        mkdir -p ${configWebsitePath}/static
-        cp -f -R ${configCloudreveCommandFolder}/statics/* ${configWebsitePath}/static
-        mv -f ${configWebsitePath}/static/static/* ${configWebsitePath}/static
+        # mkdir -p ${configWebsitePath}/static
+        # cp -f -R ${configCloudreveCommandFolder}/statics/* ${configWebsitePath}/static
+        # mv -f ${configWebsitePath}/static/static/* ${configWebsitePath}/static
 
         mkdir -p ${nginxCloudreveStoragePath}
         ${sudoCmd} chown -R ${wwwUsername}:${wwwUsername} ${nginxCloudreveStoragePath}
@@ -2142,24 +2191,7 @@ EOF
         root $configWebsitePath;
         index index.php index.html index.htm;
 
-        location ~ .*\.(gif|jpg|jpeg|png|bmp|swf)$ {
-            expires      3d;
-            error_log /dev/null;
-            access_log /dev/null;
-        }
-        
-        location ~ .*\.(js|css)?$ {
-            expires      24h;
-            error_log /dev/null;
-            access_log /dev/null; 
-        }
-        
-        location /static {
-            root $configWebsitePath;
-        }
-
         location / {
-
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header Host \$http_host;
@@ -2167,7 +2199,7 @@ EOF
             proxy_pass http://127.0.0.1:${configCloudrevePort};
 
             # 如果您要使用本地存储策略，请将下一行注释符删除，并更改大小为理论最大文件尺寸
-            client_max_body_size   7000m;
+            client_max_body_size  20000m;
         }
     }
 
@@ -2211,6 +2243,7 @@ EOF
         location / {
 
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
             proxy_set_header X-Real-IP \$remote_addr;
             proxy_set_header Host \$http_host;
             proxy_set_header Range \$http_range;
@@ -2219,6 +2252,7 @@ EOF
             proxy_pass http://127.0.0.1:${configAlistPort};
 
             # 上传的最大文件尺寸
+            # the max size of file to upload
             client_max_body_size   20000m;
         }
     }
@@ -2363,6 +2397,174 @@ EOF
     }
 EOF
 
+    elif [[ "${configInstallNginxMode}" == "joplin" ]]; then
+
+        cat > "${nginxConfigSiteConfPath}/joplin_site.conf" <<-EOF
+
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 http2;
+        server_name  $configSSLDomain;
+
+        ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
+        ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
+
+        # Config for 0-RTT in TLSv1.3
+        ssl_early_data on;
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        add_header Strict-Transport-Security "max-age=31536000";
+        
+        root $configWebsitePath;
+        index index.php index.html index.htm;
+
+        location / {
+
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header Host \$http_host;
+            proxy_set_header Range \$http_range;
+            proxy_set_header If-Range \$http_if_range;
+            proxy_redirect off;
+            proxy_pass http://127.0.0.1:${configJoplin_PORT};
+
+        }
+    }
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name  $configSSLDomain;
+        return 301 https://$configSSLDomain\$request_uri;
+    }
+EOF
+
+    elif [[ "${configInstallNginxMode}" == "affine" ]]; then
+        cat > "${nginxConfigSiteConfPath}/affine_site.conf" <<-EOF
+
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 http2;
+        server_name  $configSSLDomain;
+
+        ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
+        ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
+
+        # Config for 0-RTT in TLSv1.3
+        ssl_early_data on;
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        add_header Strict-Transport-Security "max-age=31536000";
+        
+        root $configWebsitePath;
+        index index.php index.html index.htm;
+
+        location / {
+
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header Host \$http_host;
+            proxy_set_header Range \$http_range;
+            proxy_set_header If-Range \$http_if_range;
+            proxy_redirect off;
+            proxy_pass http://127.0.0.1:${configAffine_PORT};
+
+        }
+    }
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name  $configSSLDomain;
+        return 301 https://$configSSLDomain\$request_uri;
+    }
+EOF
+
+
+    elif [[ "${configInstallNginxMode}" == "focalboard" ]]; then
+        cat > "${nginxConfigSiteConfPath}/focalboard_site.conf" <<-EOF
+
+    upstream focalboard {
+        server localhost:${configFocalboard_PORT};
+        keepalive 32;
+    }
+
+    server {
+        listen 443 ssl http2;
+        listen [::]:443 http2;
+        server_name  $configSSLDomain;
+
+        ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
+        ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
+
+        # Config for 0-RTT in TLSv1.3
+        ssl_early_data on;
+        ssl_stapling on;
+        ssl_stapling_verify on;
+        add_header Strict-Transport-Security "max-age=31536000";
+        
+        root $configWebsitePath;
+        index index.php index.html index.htm;
+
+        location ~ /ws/* {
+            proxy_set_header Upgrade \$http_upgrade;
+            proxy_set_header Connection "upgrade";
+            client_max_body_size 50M;
+            proxy_set_header Host \$http_host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_set_header X-Frame-Options SAMEORIGIN;
+            proxy_buffers 256 16k;
+            proxy_buffer_size 16k;
+            client_body_timeout 60;
+            send_timeout 300;
+            lingering_timeout 5;
+            proxy_connect_timeout 1d;
+            proxy_send_timeout 1d;
+            proxy_read_timeout 1d;
+            proxy_pass http://focalboard;
+        }
+
+        location / {
+            proxy_set_header Range \$http_range;
+            proxy_set_header If-Range \$http_if_range;
+            proxy_redirect off;
+
+            client_max_body_size 50M;
+            proxy_set_header Connection "";
+            proxy_set_header Host \$http_host;
+            proxy_set_header X-Real-IP \$remote_addr;
+            proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto \$scheme;
+            proxy_set_header X-Frame-Options SAMEORIGIN;
+            proxy_buffers 256 16k;
+            proxy_buffer_size 16k;
+            proxy_read_timeout 600s;
+            proxy_cache_revalidate on;
+            proxy_cache_min_uses 2;
+            proxy_cache_use_stale timeout;
+            proxy_cache_lock on;
+            proxy_http_version 1.1;
+            proxy_pass http://focalboard;
+        }
+
+    }
+
+    server {
+        listen 80;
+        listen [::]:80;
+        server_name  $configSSLDomain;
+        return 301 https://$configSSLDomain\$request_uri;
+    }
+EOF
+
     else
         echo
     fi
@@ -2455,7 +2657,7 @@ EOF
     fi
 
     if [[ "${configInstallNginxMode}" == "cloudreve" ]]; then
-        green " Cloudreve Installed ! Working port: ${configCloudrevePort}"
+        green " Cloudreve Installed successfully ! Running at port: ${configCloudrevePort}"
         green " Please visit https://${configSSLDomain}"
         green " 查看运行状态命令: systemctl status cloudreve  重启: systemctl restart cloudreve "
         green " Cloudreve INI 配置文件路径: ${configCloudreveIni}"
@@ -2867,6 +3069,178 @@ function removeGrist(){
 
 
 
+configJoplinProjectPath="${HOME}/joplin"
+configJoplinDockerPath="${HOME}/joplin/docker"
+configJoplinDockerComposeFilePath="${HOME}/joplin/docker/docker-compose.yml"
+configJoplinDockerPostgresPath="${HOME}/joplin/docker/data"
+configJoplinDockerFileStoragePath="${HOME}/joplin/docker/data/storage"
+
+configJoplin_PostgreSQLDATABASE="joplindb"
+configJoplin_PostgreSQLUSER="postgreuser1"
+configJoplin_PostgreSQLPASSWORD="postgreuser1pw"
+configJoplin_PostgreSQLPORT="5432"
+configJoplin_PORT="22300"
+configJoplin_APP_BASE_URL="https://joplin.example.com/"
+
+function installJoplin(){
+    # https://www.vultr.com/docs/how-to-host-a-joplin-server-with-docker-on-ubuntu/
+
+    if [[ -d "${configJoplinDockerPath}" ]]; then
+        showHeaderRed " Joplin already installed !"
+        exit
+    fi
+    showHeaderGreen "Start to install Joplin with docker"
+
+    ${sudoCmd} mkdir -p "${configJoplinDockerPostgresPath}"
+    ${sudoCmd} mkdir -p "${configJoplinDockerFileStoragePath}"
+    ${sudoCmd} chmod -R 777 ${configJoplinDockerFileStoragePath}
+
+    cd "${configJoplinDockerPath}" || exit
+
+    read -r -p "请输入PostgreSQL 数据库名 (直接回车默认为joplindb):" configJoplin_PostgreSQLDATABASE
+    configJoplin_PostgreSQLDATABASE=${configJoplin_PostgreSQLDATABASE:-joplindb}
+    echo
+    read -r -p "请输入PostgreSQL USER (直接回车默认为postgreuser1):" configJoplin_PostgreSQLUSER
+    configJoplin_PostgreSQLUSER=${configJoplin_PostgreSQLUSER:-postgreuser1}
+    echo
+    read -r -p "请输入PostgreSQL PASSWORD (直接回车默认为postgreuser1pw):" configJoplin_PostgreSQLPASSWORD
+    configJoplin_PostgreSQLPASSWORD=${configJoplin_PostgreSQLPASSWORD:-postgreuser1pw}
+    echo
+    read -r -p "请输入PostgreSQL PORT (直接回车默认为5432):" configJoplin_PostgreSQLPORT
+    configJoplin_PostgreSQLPORT=${configJoplin_PostgreSQLPORT:-5432}
+    echo
+    read -r -p "请输入Joplin Server PORT (直接回车默认为22300):" configJoplin_PORT
+    configJoplin_PORT=${configJoplin_PORT:-22300}
+    echo
+
+
+
+    green " ================================================== "
+    echo
+    green "是否安装 Nginx web服务器, 安装Nginx可以提高安全性并提供更多功能"
+    green "如要安装 Nginx 需要提供域名, 并设置好域名DNS已解析到本机IP"
+    echo
+    read -r -p "是否安装 Nginx web服务器? 直接回车默认安装, 请输入[Y/n]:" isNginxInstallInput
+    isNginxInstallInput=${isNginxInstallInput:-Y}
+
+    echo
+    red "如果选择安装 Nginx, 请输入你的域名 例如 joplin.xxx.com (不要带有 https:// 或者 http://)"
+    red "如果选择不安装 Nginx, 请输入你的IP 例如 192.168.1.1 (不要带有 https:// 或者 http://)"
+    echo
+    read -r -p "请输入域名或IP (直接回车默认为 joplin.xxx.com):" configJoplin_APP_BASE_URL
+    configJoplin_APP_BASE_URL=${configJoplin_APP_BASE_URL:-joplin.xxx.com}
+    echo
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        configJoplin_APP_BASE_URL="https://${configJoplin_APP_BASE_URL}"
+    else
+        configJoplin_APP_BASE_URL="http://${configJoplin_APP_BASE_URL}:${configJoplin_PORT}"
+    fi
+
+
+    docker pull joplin/server
+    docker pull postgres:15
+
+    cat > "${configJoplinDockerComposeFilePath}" <<-EOF
+
+version: '3'
+
+services:
+    joplin_db:
+        image: postgres:15
+        container_name: joplin_postgres
+        volumes:
+            - ${configJoplinDockerPostgresPath}/postgres_data:/var/lib/postgresql/data
+        ports:
+            - "${configJoplin_PostgreSQLPORT}:5432"
+        restart: unless-stopped
+        environment:
+            - POSTGRES_PASSWORD=${configOutline_PostgreSQLPASSWORD}
+            - POSTGRES_USER=${configOutline_PostgreSQLUSER}
+            - POSTGRES_DB=${configOutline_PostgreSQLDATABASE}
+    joplin:
+        image: joplin/server:latest
+        container_name: joplin_app1
+        volumes:
+            - ${configJoplinDockerFileStoragePath}:/mnt/files
+        depends_on:
+            - joplin_db
+        ports:
+            - "${configJoplin_PORT}:22300"
+        restart: unless-stopped
+        environment:
+            - APP_PORT=22300
+            - APP_BASE_URL=${configJoplin_APP_BASE_URL}
+            - DB_CLIENT=pg
+            - POSTGRES_PASSWORD=${configJoplin_PostgreSQLPASSWORD}
+            - POSTGRES_DATABASE=${configJoplin_PostgreSQLDATABASE}
+            - POSTGRES_USER=${configJoplin_PostgreSQLUSER}
+            - POSTGRES_PORT=5432
+            - POSTGRES_HOST=joplin_db
+            - STORAGE_DRIVER=Type=Filesystem; Path=/mnt/files
+            - STORAGE_DRIVER_FALLBACK=Type=Database; Mode=ReadAndWrite
+
+EOF
+
+    docker-compose up -d
+
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        isInstallNginx="true"
+        configSSLCertPath="${configSSLCertPath}/joplin"
+        getHTTPSCertificateStep1
+        configInstallNginxMode="joplin"
+        installWebServerNginx
+
+        ${sudoCmd} systemctl restart nginx.service
+
+        showHeaderGreen "Joplin Server install success !  https://${configSSLDomain}" \
+        "POSTGRES_USER: ${configJoplin_PostgreSQLUSER}, POSTGRES_PASSWORD: ${configJoplin_PostgreSQLPASSWORD}" \
+        "Joplin_Admin_USER: admin@localhost, Joplin_Admin_PASSWORD: admin" \
+        "Joplin_Data Path : ${configJoplinDockerPath}" \
+        "Joplin Logs: docker-compose --file docker-compose.yml logs" 
+    else
+
+        showHeaderGreen "Joplin Server install success !  ${configJoplin_APP_BASE_URL}" \
+        "POSTGRES_USER: ${configJoplin_PostgreSQLUSER}, POSTGRES_PASSWORD: ${configJoplin_PostgreSQLPASSWORD}" \
+        "Joplin_Admin_USER: admin@localhost, Joplin_Admin_PASSWORD: admin" \
+        "Joplin_Data Path : ${configJoplinDockerPath}" \
+        "Joplin Logs: docker-compose --file docker-compose.yml logs" 
+    fi
+
+}
+
+
+function removeJoplin(){
+    echo
+
+    read -r -p "是否确认卸载Joplin? 直接回车默认卸载, 请输入[Y/n]:" isRemoveJoplinInput
+    isRemoveJoplinInput=${isRemoveJoplinInput:-Y}
+
+
+    if [[ "${isRemoveJoplinInput}" == [Yy] ]]; then
+
+        echo
+        if [[ -d "${configJoplinDockerPath}" ]]; then
+
+            showHeaderGreen "准备卸载已安装的 Joplin Server"
+
+            cd ${configJoplinDockerPath} || exit
+            docker-compose down 
+
+            rm -rf "${configJoplinDockerPath}"
+            rm -f "${nginxConfigSiteConfPath}/joplin_site.conf"
+            
+            systemctl restart nginx.service
+            showHeaderGreen "已成功卸载 Joplin Server 版本 !"
+            
+        else
+            showHeaderRed "系统没有安装 Joplin Server, 退出卸载"
+        fi
+
+    fi
+    removeNginx
+}
 
 
 
@@ -2877,6 +3251,782 @@ function removeGrist(){
 
 
 
+
+
+
+
+configAffineDockerPath="${HOME}/affine/docker"
+configAffineDockerFileStoragePath="${HOME}/affine/docker/data"
+
+configAffine_PORT="3300"
+configAffine_APP_BASE_URL="https://affine.example.com/"
+
+function installAffine(){
+    # https://affine.pro/blog/a-new-docker-image-with-the-server-side-is-coming
+
+    if [[ -d "${configAffineDockerPath}" ]]; then
+        showHeaderRed " AFFiNE already installed !"
+        exit
+    fi
+    showHeaderGreen "Start to install AFFiNE with docker"
+
+    ${sudoCmd} mkdir -p "${configAffineDockerFileStoragePath}"
+
+    cd "${configAffineDockerPath}" || exit
+
+
+    echo
+    read -r -p "请输入 AFFiNE Server PORT (直接回车默认为3300):" configAffine_PORT
+    configAffine_PORT=${configAffine_PORT:-3300}
+    echo
+
+
+    green " ================================================== "
+    echo
+    green "是否安装 Nginx web服务器, 安装Nginx可以提高安全性并提供更多功能"
+    green "如要安装 Nginx 需要提供域名, 并设置好域名DNS已解析到本机IP"
+    echo
+    read -r -p "是否安装 Nginx web服务器? 直接回车默认安装, 请输入[Y/n]:" isNginxInstallInput
+    isNginxInstallInput=${isNginxInstallInput:-Y}
+
+    echo
+    red "如果选择安装 Nginx, 请输入你的域名 例如 affine.xxx.com (不要带有 https:// 或者 http://)"
+    red "如果选择不安装 Nginx, 请输入你的IP 例如 192.168.1.1 (不要带有 https:// 或者 http://)"
+    echo
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        read -r -p "请输入域名 (直接回车默认为 affine.xxx.com):" configAffine_APP_Domain
+        configAffine_APP_Domain=${configAffine_APP_Domain:-affine.xxx.com}
+
+        configAffine_APP_BASE_URL="https://${configAffine_APP_Domain}"
+    else
+        getVPSIP
+
+        configAffine_APP_BASE_URL="http://${configLocalVPSIp}:${configAffine_PORT}"
+    fi
+
+
+    docker pull ghcr.io/toeverything/affine-self-hosted:latest
+
+
+    cat > "${configAffineDockerPath}/docker-compose.yml" <<-EOF
+
+version: '3'
+
+services:
+    affine:
+        image: ghcr.io/toeverything/affine-self-hosted:latest
+        container_name: affine_app1
+        ports:
+            - "${configAffine_PORT}:3000"
+        volumes:
+            - ${configAffineDockerFileStoragePath}:/app/data
+        restart: unless-stopped
+
+EOF
+
+    docker-compose up -d
+
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        isInstallNginx="true"
+        configSSLCertPath="${configSSLCertPath}/affine"
+        getHTTPSCertificateStep1
+        configInstallNginxMode="affine"
+        installWebServerNginx
+
+        ${sudoCmd} systemctl restart nginx.service
+
+    fi
+        showHeaderGreen "AFFiNE Server install success !  ${configAffine_APP_BASE_URL}" \
+        "AFFiNE_Admin_USER: admin@localhost, AFFiNE_Admin_PASSWORD: admin" \
+        "AFFiNE_Data Path : ${configAffineDockerPath}" \
+        "AFFiNE Logs: docker-compose --file docker-compose.yml logs" 
+}
+
+
+function removeAffine(){
+    echo
+    read -r -p "是否确认卸载AFFiNE? 直接回车默认卸载, 请输入[Y/n]:" isRemoveAffineInput
+    isRemoveAffineInput=${isRemoveAffineInput:-Y}
+
+    if [[ "${isRemoveAffineInput}" == [Yy] ]]; then
+
+        echo
+        if [[ -d "${configAffineDockerPath}" ]]; then
+
+            showHeaderGreen "准备卸载已安装的 AFFiNE Server"
+
+            cd ${configAffineDockerPath} || exit
+            docker-compose down 
+
+            rm -rf "${configAffineDockerPath}"
+            rm -f "${nginxConfigSiteConfPath}/affine_site.conf"
+
+            if [[ -f ""${nginxConfigSiteConfPath}/affine_site.conf"" ]]; then
+                rm -f "${nginxConfigSiteConfPath}/affine_site.conf"
+                systemctl restart nginx.service
+            fi
+            
+            showHeaderGreen "已成功卸载 AFFiNE Server 版本 !"
+            
+        else
+            showHeaderRed "系统没有安装 AFFiNE Server, 退出卸载"
+        fi
+
+    fi
+    removeNginx
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+configOutlineDockerPath="${HOME}/outline/docker"
+configOutlineDockerComposeFilePath="${HOME}/outline/docker/docker-compose.yml"
+configOutlineDockerPostgresPath="${HOME}/outline/docker/postgres"
+configOutlineDockerRedisPath="${HOME}/outline/docker/redis"
+configOutlineDockerFileStoragePath="${HOME}/outline/docker/minio/storage_data"
+configOutlineDockerHttpsPortalPath="${HOME}/outline/docker/https_portal"
+
+configOutline_PORT="3000"
+configOutline_PostgreSQLDATABASE="outlinedb"
+configOutline_PostgreSQLUSER="postgreuseradmin"
+configOutline_PostgreSQLPASSWORD="postgreuseradminpw"
+configOutline_PostgreSQLPORT="5432"
+configOutline_MinioAdminUSER="minioadmin"
+configOutline_MinioAdminPASSWORD="minioadminpw"
+configOutline_APP_BASE_URL="https://outline.example.com/"
+configOutline_BUCKET_NAME="wiki"
+
+function installOutline(){
+    # https://docs.getoutline.com/s/hosting/doc/docker-7pfeLP5a8t
+
+    if [[ -d "${configOutlineDockerPath}" ]]; then
+        showHeaderRed " Outline already installed !"
+        exit
+    fi
+    showHeaderGreen "开始 使用Docker方式 安装 Outline "
+
+    ${sudoCmd} mkdir -p "${configOutlineDockerPostgresPath}"
+    ${sudoCmd} mkdir -p "${configOutlineDockerRedisPath}"
+    ${sudoCmd} mkdir -p "${configOutlineDockerFileStoragePath}"
+    ${sudoCmd} mkdir -p "${configOutlineDockerHttpsPortalPath}"
+
+    cd "${configOutlineDockerPath}" || exit
+
+    # wget https://raw.githubusercontent.com/outline/outline/main/.env.sample -O "${configOutlineDockerPath}/.env"
+
+
+    read -r -p "请输入PostgreSQL 数据库名 (直接回车默认为outlinedb):" configOutline_PostgreSQLDATABASE
+    configOutline_PostgreSQLDATABASE=${configOutline_PostgreSQLDATABASE:-outlinedb}
+    echo
+    read -r -p "请输入PostgreSQL USER (直接回车默认为postgreuseradmin):" configOutline_PostgreSQLUSER
+    configOutline_PostgreSQLUSER=${configOutline_PostgreSQLUSER:-postgreuseradmin}
+    echo
+    read -r -p "请输入PostgreSQL PASSWORD (直接回车默认为postgreuseradminpw):" configOutline_PostgreSQLPASSWORD
+    configOutline_PostgreSQLPASSWORD=${configOutline_PostgreSQLPASSWORD:-postgreuseradminpw}
+    echo
+    read -r -p "请输入PostgreSQL PORT (直接回车默认为5432):" configOutline_PostgreSQLPORT
+    configOutline_PostgreSQLPORT=${configOutline_PostgreSQLPORT:-5432}
+    echo
+
+    read -r -p "请输入Minio Admin USER (直接回车默认为minioadmin):" configOutline_MinioAdminUSER
+    configOutline_MinioAdminUSER=${configOutline_MinioAdminUSER:-minioadmin}
+    echo
+    read -r -p "请输入Minio Admin PASSWORD (直接回车默认为minioadminpw):" configOutline_MinioAdminPASSWORD
+    configOutline_MinioAdminPASSWORD=${configOutline_MinioAdminPASSWORD:-minioadminpw}
+    echo
+
+    read -r -p "请输入Outline Server PORT (直接回车默认为3000):" configOutline_PORT
+    configOutline_PORT=${configOutline_PORT:-3000}
+    echo
+
+
+
+    green " ================================================== "
+    echo
+    green "请输入域名 不要带有 https:// 或者 http://"
+    echo
+    read -r -p "请输入域名 (直接回车默认为 outline.xxx.com):" configOutline_APP_BASE_URL
+    configOutline_APP_BASE_URL=${configOutline_APP_BASE_URL:-outline.xxx.com}
+    echo
+
+
+    tempStringHex32=$(openssl rand -hex 32)
+    tempString2Hex32=$(openssl rand -hex 32)
+
+    cat > "${configOutlineDockerPath}/docker.env" <<-EOF
+# –––––––––––––––– REQUIRED ––––––––––––––––
+
+NODE_ENV=production
+
+SECRET_KEY=${tempStringHex32}
+UTILS_SECRET=${tempString2Hex32}
+
+DATABASE_URL=postgres://${configOutline_PostgreSQLUSER}:${configOutline_PostgreSQLPASSWORD}@outline_postgres:5432/${configOutline_PostgreSQLDATABASE}
+DATABASE_URL_TEST=postgres://${configOutline_PostgreSQLUSER}:${configOutline_PostgreSQLPASSWORD}@outline_postgres:5432/outline-test
+DATABASE_CONNECTION_POOL_MIN=
+DATABASE_CONNECTION_POOL_MAX=
+# Uncomment this to disable SSL for connecting to Postgres
+# PGSSLMODE=disable
+
+
+REDIS_URL=redis://outline_redis:6379
+
+URL=http://${configOutline_APP_BASE_URL}:3000
+PORT=3000
+
+# See [documentation](docs/SERVICES.md) on running a separate collaboration
+# server, for normal operation this does not need to be set.
+COLLABORATION_URL=
+
+# To support uploading of images for avatars and document attachments an
+# s3-compatible storage must be provided. AWS S3 is recommended for redundancy
+# however if you want to keep all file storage local an alternative such as
+# minio (https://github.com/minio/minio) can be used.
+AWS_ACCESS_KEY_ID=${configOutline_MinioAdminUSER}
+AWS_SECRET_ACCESS_KEY=${configOutline_MinioAdminPASSWORD}
+AWS_REGION=us-east-1
+AWS_S3_ACCELERATE_URL=
+AWS_S3_UPLOAD_BUCKET_URL=http://127.0.0.1:9000
+AWS_S3_UPLOAD_BUCKET_NAME=${configOutline_BUCKET_NAME}
+AWS_S3_UPLOAD_MAX_SIZE=26214400
+AWS_S3_FORCE_PATH_STYLE=true
+AWS_S3_ACL=private
+
+
+# –––––––––––––––– OPTIONAL ––––––––––––––––
+
+
+# If using a Cloudfront/Cloudflare distribution or similar it can be set below.
+# This will cause paths to javascript, stylesheets, and images to be updated to
+# the hostname defined in CDN_URL. In your CDN configuration the origin server
+# should be set to the same as URL.
+CDN_URL=
+
+# Auto-redirect to https in production. The default is true but you may set to
+# false if you can be sure that SSL is terminated at an external loadbalancer.
+FORCE_HTTPS=false
+
+# Have the installation check for updates by sending anonymized statistics to
+# the maintainers
+ENABLE_UPDATES=true
+
+# How many processes should be spawned. As a reasonable rule divide your servers
+# available memory by 512 for a rough estimate
+WEB_CONCURRENCY=2
+
+# Override the maximum size of document imports, could be required if you have
+# especially large Word documents with embedded imagery
+MAXIMUM_IMPORT_SIZE=5120000
+
+# You can remove this line if your reverse proxy already logs incoming http
+# requests and this ends up being duplicative
+DEBUG=http
+
+# Configure lowest severity level for server logs. Should be one of
+# error, warn, info, http, verbose, debug and silly
+LOG_LEVEL=info
+
+
+# Optionally enable google analytics to track pageviews in the knowledge base
+GOOGLE_ANALYTICS_ID=
+
+# Optionally enable Sentry (sentry.io) to track errors and performance,
+# and optionally add a Sentry proxy tunnel for bypassing ad blockers in the UI:
+# https://docs.sentry.io/platforms/javascript/troubleshooting/#using-the-tunnel-option)
+SENTRY_DSN=
+SENTRY_TUNNEL=
+
+# To support sending outgoing transactional emails such as "document updated" or
+# "you've been invited" you'll need to provide authentication for an SMTP server
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM_EMAIL=
+SMTP_REPLY_EMAIL=
+SMTP_TLS_CIPHERS=
+SMTP_SECURE=true
+SMTP_NAME=
+
+# The default interface language. See translate.getoutline.com for a list of
+# available language codes and their rough percentage translated.
+DEFAULT_LANGUAGE=en_US
+
+# Optionally enable rate limiter at application web server
+RATE_LIMITER_ENABLED=true
+
+# Configure default throttling parameters for rate limiter
+RATE_LIMITER_REQUESTS=1000
+RATE_LIMITER_DURATION_WINDOW=60
+
+
+EOF
+
+
+
+    cat > "${configOutlineDockerComposeFilePath}" <<-EOF
+
+version: "3.2"
+services:
+
+  outline:
+    image: docker.getoutline.com/outlinewiki/outline:latest
+    container_name: outline_app1
+    # env_file: ${configOutlineDockerPath}/docker.env
+    ports:
+      - "${configOutline_PORT}:3000"
+    depends_on:
+      - outline_postgres
+      - outline_redis
+      - outline_storage
+    environment:
+      - PGSSLMODE=disable
+      - SECRET_KEY=${tempStringHex32}
+      - UTILS_SECRET=${tempString2Hex32}
+      - REDIS_URL=redis://outline_redis:6379
+      - DATABASE_URL=postgres://${configOutline_PostgreSQLUSER}:${configOutline_PostgreSQLPASSWORD}@outline_postgres:5432/${configOutline_PostgreSQLDATABASE}
+      - URL=http://${configOutline_APP_BASE_URL}:3000
+      - AWS_ACCESS_KEY_ID=${configOutline_MinioAdminUSER}
+      - AWS_SECRET_ACCESS_KEY=${configOutline_MinioAdminPASSWORD}
+      - AWS_REGION=us-east-1
+      - AWS_S3_UPLOAD_BUCKET_URL=http://127.0.0.1:9000
+      - AWS_S3_UPLOAD_BUCKET_NAME=${configOutline_BUCKET_NAME}
+      - AWS_S3_FORCE_PATH_STYLE=true
+      - AWS_S3_ACL=private 
+      - FORCE_HTTPS=false
+
+  outline_redis:
+    image: redis:latest
+    container_name: outline_redis
+    ports:
+      - "6379:6379"
+    restart: always
+    volumes:
+      - ${configOutlineDockerRedisPath}/redis_data/:/data
+    command: ["redis-server" ]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+
+  outline_postgres:
+    image: postgres:15
+    container_name: outline_postgresdb
+    ports:
+      - "${configOutline_PostgreSQLPORT}:5432"
+    volumes:
+      -  ${configOutlineDockerPostgresPath}/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${configOutline_PostgreSQLDATABASE}", "-U", "${configOutline_PostgreSQLUSER}"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    environment:
+      POSTGRES_USER: '${configOutline_PostgreSQLUSER}'
+      POSTGRES_PASSWORD: '${configOutline_PostgreSQLPASSWORD}'
+      POSTGRES_DB: '${configOutline_PostgreSQLDATABASE}'
+
+  outline_storage:
+    image: minio/minio
+    container_name: outline_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    entrypoint: sh
+    command: -c 'minio server /data --console-address ":9001"'
+    deploy:
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - ${configOutlineDockerFileStoragePath}:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    environment:
+      MINIO_ROOT_USER: ${configOutline_MinioAdminUSER}
+      MINIO_ROOT_PASSWORD: ${configOutline_MinioAdminPASSWORD}
+
+  outline_createbuckets:
+    image: minio/mc
+    container_name: outline_createbucket
+    depends_on:
+      - outline_storage
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host rm local;
+      /usr/bin/mc config host add myminio http://outline_storage:9000 ${configOutline_MinioAdminUSER} ${configOutline_MinioAdminPASSWORD};
+      /usr/bin/mc mb myminio/${configOutline_BUCKET_NAME};
+      /usr/bin/mc policy set public myminio/${configOutline_BUCKET_NAME};
+      exit 0;
+      "
+
+  outline_https-portal:
+    image: steveltn/https-portal
+    container_name: outline_https_portal
+    ports:
+      - '80:80'
+      - '443:443'
+    links:
+      - outline
+      - outline_storage
+    restart: always
+    volumes:
+      - ${configOutlineDockerHttpsPortalPath}:/var/lib/https-portal
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    environment:
+      DOMAINS: '${configOutline_APP_BASE_URL} -> http://outline:3000'
+      STAGE: 'production'
+      WEBSOCKET: 'true'
+
+
+EOF
+
+    docker-compose up -d
+
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        isInstallNginx="true"
+        configSSLCertPath="${configSSLCertPath}/outline"
+        # getHTTPSCertificateStep1
+        configInstallNginxMode="outline"
+        # installWebServerNginx
+
+        # ${sudoCmd} systemctl restart nginx.service
+
+    fi
+
+        showHeaderGreen "Outline Server install success !  https://${configOutline_APP_BASE_URL}" \
+        "POSTGRES_USER: ${configOutline_PostgreSQLUSER}, POSTGRES_PASSWORD: ${configOutline_PostgreSQLPASSWORD}" \
+        "Outline Do Not support email login, Pls manually set up authentication" \
+        "Outline docker-compose config path : ${configOutlineDockerComposeFilePath}" \
+        "Outline docker env path : ${configOutlineDockerPath}/docker.env " \
+        "Outline Logs: docker-compose logs outline" 
+}
+
+
+function removeOutline(){
+    echo
+    read -r -p "是否确认卸载Outline? 直接回车默认卸载, 请输入[Y/n]:" isRemoveOutlineInput
+    isRemoveOutlineInput=${isRemoveOutlineInput:-Y}
+
+    if [[ "${isRemoveOutlineInput}" == [Yy] ]]; then
+
+        echo
+        if [[ -d "${configOutlineDockerPath}" ]]; then
+
+            showHeaderGreen "准备卸载已安装的 Outline Server"
+
+            cd ${configOutlineDockerPath} || exit
+            docker-compose down 
+
+            rm -rf "${configOutlineDockerPath}"
+            rm -f "${nginxConfigSiteConfPath}/outline_site.conf"
+            
+            if [[ -f "${nginxConfigSiteConfPath}/outline_site.conf" ]]; then
+                rm -f "${nginxConfigSiteConfPath}/outline_site.conf"
+                systemctl restart nginx.service
+            fi
+
+            
+            showHeaderGreen "已成功卸载 Outline Server 版本 !"
+            
+        else
+            showHeaderRed "系统没有安装 Outline Server, 退出卸载"
+        fi
+
+    fi
+    removeNginx
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+configFocalboardDockerPath="${HOME}/focalboard/docker"
+configFocalboardDockerDataPath="${HOME}/focalboard/docker/data"
+configFocalboardDockerPostgresPath="${HOME}/focalboard/docker/postgres"
+
+configFocalboard_PORT="8001"
+config_APP_BASE_URL="https://focalboard.example.com/"
+configFocalboard_PostgreSQLDATABASE="focalboarddb"
+configFocalboard_PostgreSQLUSER="postgreuseradmin"
+configFocalboard_PostgreSQLPASSWORD="postgreuseradminpw"
+configFocalboard_PostgreSQLPORT="5432"
+
+function installFocalboard(){
+    # https://www.focalboard.com/download/personal-edition/docker/
+
+    if [[ -d "${configFocalboardDockerPath}" ]]; then
+        showHeaderRed " Focalboard Personal Server already installed !"
+        exit
+    fi
+    showHeaderGreen "Start to install Focalboard Personal Server with docker"
+
+    ${sudoCmd} mkdir -p "${configFocalboardDockerDataPath}"
+
+    ${sudoCmd} chmod -R 777 "${configFocalboardDockerDataPath}"
+    cd "${configFocalboardDockerPath}" || exit
+
+
+    echo
+    read -r -p "请输入 Focalboard Server PORT (直接回车默认为8001):" configFocalboard_PORT
+    configFocalboard_PORT=${configFocalboard_PORT:-8001}
+
+
+    echo
+    read -r -p "数据库是否使用sqlite, 否为使用postgresql? 直接回车默认使用sqlite, 请输入[Y/n]:" isUseSqliteInput
+    isUseSqliteInput=${isUseSqliteInput:-Y}
+
+    configFocalboardDatabaseType="sqlite3"
+    configFocalboardDatabaseLink="./data/focalboard.db"
+
+    if [[ "${isUseSqliteInput}" == [Yy] ]]; then
+        configFocalboardDatabaseType="sqlite3"
+        configFocalboardDatabaseLink="./data/focalboard.db"
+
+    cat > "${configFocalboardDockerPath}/docker-compose.yml" <<-EOF
+
+version: '3'
+
+services:
+    focalboard:
+        image: mattermost/focalboard
+        container_name: focalboard_app1
+        ports:
+            - "${configFocalboard_PORT}:8000"
+        volumes:
+            - ${configFocalboardDockerDataPath}:/opt/focalboard/data
+            - ${configFocalboardDockerPath}/config.json:/opt/focalboard/config.json
+        restart: unless-stopped
+        environment:
+            - VIRTUAL_HOST=focalboard.local
+            - VIRTUAL_PORT=8000
+
+EOF
+
+
+    else
+        ${sudoCmd} mkdir -p "${configFocalboardDockerPostgresPath}"
+
+        read -r -p "请输入PostgreSQL 数据库名 (直接回车默认为focalboarddb):" configFocalboard_PostgreSQLDATABASE
+        configFocalboard_PostgreSQLDATABASE=${configFocalboard_PostgreSQLDATABASE:-focalboarddb}
+        echo
+        read -r -p "请输入PostgreSQL USER (直接回车默认为postgreuseradmin):" configFocalboard_PostgreSQLUSER
+        configFocalboard_PostgreSQLUSER=${configFocalboard_PostgreSQLUSER:-postgreuseradmin}
+        echo
+        read -r -p "请输入PostgreSQL PASSWORD (直接回车默认为postgreuseradminpw):" configFocalboard_PostgreSQLPASSWORD
+        configFocalboard_PostgreSQLPASSWORD=${configFocalboard_PostgreSQLPASSWORD:-postgreuseradminpw}
+        echo
+        read -r -p "请输入PostgreSQL PORT (直接回车默认为5432):" configFocalboard_PostgreSQLPORT
+        configFocalboard_PostgreSQLPORT=${configFocalboard_PostgreSQLPORT:-5432}
+        echo
+
+        # https://github.com/mattermost/focalboard/blob/main/docker/config.json
+        configFocalboardDatabaseType="postgres"
+        configFocalboardDatabaseLink="postgres://${configFocalboard_PostgreSQLUSER}:${configFocalboard_PostgreSQLPASSWORD}@focalboard_db/${configFocalboard_PostgreSQLDATABASE}?sslmode=disable&connect_timeout=10"
+
+    cat > "${configFocalboardDockerPath}/docker-compose.yml" <<-EOF
+
+version: '3'
+
+services:
+    focalboard:
+        image: mattermost/focalboard
+        container_name: focalboard_app1
+        depends_on:
+            - focalboard_db 
+        ports:
+            - "${configFocalboard_PORT}:8000"
+        volumes:
+            - ${configFocalboardDockerDataPath}:/opt/focalboard/data
+            - ${configFocalboardDockerPath}/config.json:/opt/focalboard/config.json
+        restart: unless-stopped
+        environment:
+            - VIRTUAL_HOST=focalboard.local
+            - VIRTUAL_PORT=8000
+
+    focalboard_db:
+        image: postgres:latest
+        container_name: focalboard_postgresdb
+        ports:
+            - "${configFocalboard_PostgreSQLPORT}:5432"
+        restart: always
+        volumes:
+            -  ${configFocalboardDockerPostgresPath}/postgres_data:/var/lib/postgresql/data
+        environment:
+            POSTGRES_DB: '${configFocalboard_PostgreSQLDATABASE}'
+            POSTGRES_USER: '${configFocalboard_PostgreSQLUSER}'
+            POSTGRES_PASSWORD: '${configFocalboard_PostgreSQLPASSWORD}'
+
+EOF
+
+    fi
+
+    # https://www.focalboard.com/guide/admin/
+    cat > "${configFocalboardDockerPath}/config.json" <<-EOF
+{
+    "serverRoot": "http://localhost:8000",
+    "port": 8000,
+    "dbtype": "${configFocalboardDatabaseType}",
+    "dbconfig": "${configFocalboardDatabaseLink}",
+    "postgres_dbconfig": "dbname=boards sslmode=disable",
+    "useSSL": false,
+    "webpath": "./pack",
+    "filespath": "./data/files",
+    "telemetry": true,
+    "session_expire_time": 2592000,
+    "session_refresh_time": 18000,
+    "localOnly": false,
+    "enableLocalMode": true,
+    "localModeSocketLocation": "/var/tmp/focalboard_local.socket",
+    "enablePublicSharedBoards": false
+}
+
+EOF
+
+    # https://github.com/mattermost/focalboard/blob/main/docker/server_config.json
+    cat > "${configFocalboardDockerPath}/default_config_sqlite.json" <<-EOF
+{
+  "serverRoot": "http://localhost:8000",
+  "port": 8000,
+  "dbtype": "sqlite3",
+  "dbconfig": "./data/focalboard.db",
+  "postgres_dbconfig": "dbname=focalboard sslmode=disable",
+  "useSSL": false,
+  "webpath": "./pack",
+  "filespath": "./data/files",
+  "telemetry": true,
+  "session_expire_time": 2592000,
+  "session_refresh_time": 18000,
+  "localOnly": false,
+  "enableLocalMode": true,
+  "localModeSocketLocation": "/var/tmp/focalboard_local.socket"
+}
+
+EOF
+
+
+    green " ================================================== "
+    echo
+    green "是否安装 Nginx web服务器, 安装Nginx可以提高安全性并提供更多功能"
+    green "如要安装 Nginx 需要提供域名, 并设置好域名DNS已解析到本机IP"
+    echo
+    read -r -p "是否安装 Nginx web服务器? 直接回车默认安装, 请输入[Y/n]:" isNginxInstallInput
+    isNginxInstallInput=${isNginxInstallInput:-Y}
+
+    echo
+    red "如果选择安装 Nginx, 请输入你的域名 例如 focalboard.xxx.com (不要带有 https:// 或者 http://)"
+    red "如果选择不安装 Nginx, 请输入你的IP 例如 192.168.1.1 (不要带有 https:// 或者 http://)"
+    echo
+
+    if [[ "${isNginxInstallInput}" == [Yy] ]]; then
+        isInstallNginx="true"
+        configSSLCertPath="${configSSLCertPath}/focalboard"
+        getHTTPSCertificateStep1
+        configInstallNginxMode="focalboard"
+        installWebServerNginx
+        ${sudoCmd} systemctl restart nginx.service
+
+        config_APP_BASE_URL="https://${configSSLDomain}"
+    else
+        getVPSIP
+        config_APP_BASE_URL="http://${configLocalVPSIp}:${configFocalboard_PORT}"
+    fi
+ 
+    echo
+    docker pull mattermost/focalboard
+    echo
+    docker-compose up -d
+    echo
+    
+    if [[ "${isUseSqliteInput}" == [Yy] ]]; then
+        showHeaderGreen "Focalboard Server install success !  " \
+        "Visit: ${config_APP_BASE_URL}" \
+        "Focalboard DockerCompose Config : ${configFocalboardDockerPath}/config.json" \
+        "Focalboard Sqlite Data : ${configFocalboardDockerDataPath}/focalboard.db" \
+        "Focalboard Logs: docker-compose --file docker-compose.yml logs" 
+    else
+
+        showHeaderGreen "Focalboard Server install success !  " \
+        "Visit: ${config_APP_BASE_URL}" \
+        "Focalboard DockerCompose Config : ${configFocalboardDockerPath}/config.json" \
+        "PostgreSQL Admin: ${configFocalboard_PostgreSQLUSER}, PostgreSQL Admin Password: ${configFocalboard_PostgreSQLPASSWORD}" \
+        "Focalboard PostgreSQL Data : ${configFocalboardDockerDataPath}" \
+        "Focalboard Logs: docker-compose --file docker-compose.yml logs" 
+    fi
+
+
+
+}
+
+
+function removeFocalboard(){
+    echo
+    read -r -p "是否确认卸载Focalboard? 直接回车默认卸载, 请输入[Y/n]:" isRemoveFocalboardInput
+    isRemoveFocalboardInput=${isRemoveFocalboardInput:-Y}
+
+    if [[ "${isRemoveFocalboardInput}" == [Yy] ]]; then
+
+        echo
+        if [[ -d "${configFocalboardDockerPath}" ]]; then
+
+            showHeaderGreen "准备卸载已安装的 Focalboard Server"
+
+            cd ${configFocalboardDockerPath} || exit
+            docker-compose down 
+
+            rm -rf "${configFocalboardDockerPath}"
+            
+            if [[ -f ""${nginxConfigSiteConfPath}/focalboard_site.conf"" ]]; then
+                rm -f "${nginxConfigSiteConfPath}/focalboard_site.conf"
+                systemctl restart nginx.service
+            fi
+            
+            showHeaderGreen "已成功卸载 Focalboard Server 版本 !"
+        else
+            showHeaderRed "系统没有安装 Focalboard Server, 退出卸载"
+        fi
+
+    fi
+    removeNginx
+}
 
 
 
@@ -2950,7 +4100,7 @@ function installJitsiMeetByDocker(){
 
     mkdir -p ~/.jitsi-meet-cfg/{web,transcripts,prosody/config,prosody/prosody-plugins-custom,jicofo,jvb,jigasi,jibri}
 
-    configLocalVPSIp="$(curl https://ipv4.icanhazip.com/)"
+    getVPSIP
 
     green " =================================================="
     echo
@@ -3130,7 +4280,7 @@ function installJitsiMeetOnUbuntu(){
 
     showHeaderGreen "Setting up jitsi meet local IP configuration"
 
-    configLocalVPSIp="$(curl https://ipv4.icanhazip.com/)"
+    getVPSIP
     echo
     read -r -p "请输入本机IP: 直接回车默认为 ${configLocalVPSIp}" jitsimeetVPSIPInput
     jitsimeetVPSIPInput=${jitsimeetVPSIPInput:-${configLocalVPSIp}}
@@ -3509,6 +4659,26 @@ EOF
     removeNginx
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5199,7 +6369,7 @@ function start_menu(){
 
     if [[ ${configLanguage} == "cn" ]] ; then
     green " =================================================="
-    green " Linux 常用工具 一键安装脚本 | 2022-9-29 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
+    green " Linux 常用工具 一键安装脚本 | 2023-7-10 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
     green " =================================================="
     green " 1. 安装 linux 内核 BBR Plus, 安装 WireGuard, 用于解锁 Netflix 限制 和避免弹出 Google reCAPTCHA 人机验证"
     echo
@@ -5222,40 +6392,49 @@ function start_menu(){
     green " 28. 安装 CasaOS 系统(包括 Nextcloud 云盘 和 AdGuard DNS 等)  "
     red " 29. 卸载 CasaOS 系统 " 
     echo
-    green " 31. 安装 Grist 在线Excel表格(类似 Airtable)  "
+    green " 31. 安装 Grist 在线Excel表格(类似 Airtable) "
     red " 32. 卸载 Grist 在线Excel表格 " 
-    green " 33. 安装 NocoDB 在线Excel表格(类似 Airtable)  "
+    green " 33. 安装 NocoDB 在线Excel表格(类似 Airtable) "
     red " 34. 卸载 NocoDB 在线Excel表格 " 
-    green " 35. 安装 Etherpad 多人协作文档(类似 Word)  "
+    green " 35. 安装 Etherpad 多人协作文档(类似 Word) "
     red " 36. 卸载 Etherpad 多人协作文档 "     
     echo
     green " 41. 安装 Ghost Blog 博客系统 "
-    red " 42. 卸载 Ghost Blog 博客系统 "     
+    red " 42. 卸载 Ghost Blog 博客系统 "
+    green " 43. 安装 Joplin Server 笔记(类似 Evernote) "
+    red " 44. 卸载 Joplin Server 笔记 " 
     echo
-
-    green " 47. 安装视频会议系统 Jitsi Meet "
-    red " 48. 卸载 Jitsi Meet "
-    green " 49. Jitsi Meet 发起会议是否需要密码验证"
-
+    green " 51. 安装 AFFiNE Server 多人协作笔记(类似 Notion) "
+    red " 52. 卸载 AFFiNE Server 多人协作笔记 "     
+    green " 53. 安装 Outline Server 多人协作笔记(类似 Notion) "
+    red " 54. 卸载 Outline Server 多人协作笔记 " 
     echo
-    green " 51. 安装 Air-Universe 服务器端"
-    red " 52. 卸载 Air-Universe"
-    green " 53. 停止, 重启, 查看日志等, 管理 Air-Universe 服务器端"
-    green " 54. 配合 WARP (Wireguard) 使用IPV6 解锁 google人机验证和 Netflix等流媒体网站"
-    green " 55. 升级或降级 Air-Universe 到 1.0.0 or 0.9.2, 降级 Xray 到 1.5或1.4"
-    green " 56. 重新申请证书 并修改 Air-Universe 配置文件 ${configAirUniverseConfigFilePath}"
-    green " 58. 更新 geoip.dat 和 geosite.dat 文件"
-    echo 
-    green " 61. 单独申请域名SSL证书"
+    green " 61. 安装视频会议系统 Jitsi Meet "
+    red " 62. 卸载 Jitsi Meet "
+    green " 63. Jitsi Meet 发起会议是否需要密码验证"
     echo
-    green " 77. 子菜单 安装 V2board 服务器端 XrayR, V2Ray-Poseidon, Soga"
+    green " 65. 安装 Focalboard Personal Server 项目管理看板 (类似 Trello) "
+    red " 66. 卸载 Focalboard Personal Server "
+    green " 67. 安装 Mattermost Boards Server 项目管理看板 (类似 Trello) "
+    red " 68. 卸载 Mattermost Boards Server "
+    echo
+    green " 81. 安装 Air-Universe 服务器端"
+    red " 82. 卸载 Air-Universe"
+    green " 83. 停止, 重启, 查看日志等, 管理 Air-Universe 服务器端"
+    green " 84. 配合 WARP (Wireguard) 使用IPV6 解锁 google人机验证和 Netflix等流媒体网站"
+    green " 85. 升级或降级 Air-Universe 到 1.0.0 or 0.9.2, 降级 Xray 到 1.5或1.4"
+    green " 86. 重新申请证书 并修改 Air-Universe 配置文件 ${configAirUniverseConfigFilePath}"
+    green " 87. 更新 geoip.dat 和 geosite.dat 文件"
+    echo
+    green " 89. 子菜单 安装 V2board 服务器端 XrayR, V2Ray-Poseidon, Soga"
+    green " 90. 单独申请域名SSL证书"
     echo
     green " 88. 升级脚本"
     green " 0. 退出脚本"
 
     else
     green " =================================================="
-    green " Linux tools installation script | 2022-9-29 | OS support：centos7+ / debian9+ / ubuntu16.04+"
+    green " Linux tools installation script | 2023-7-10 | OS support：centos7+ / debian9+ / ubuntu16.04+"
     green " =================================================="
     green " 1. Install linux kernel,  bbr plus kernel, WireGuard and Cloudflare WARP. Unlock Netflix geo restriction and avoid Google reCAPTCHA"
     echo
@@ -5279,31 +6458,41 @@ function start_menu(){
     red " 29. Remove CasaOS "     
     echo
     green " 31. Install Grist Online Spreadsheet (Airtable alternative)"
-    red " 32. Remove Grist Online Spreadsheet (Airtable alternative)"
+    red " 32. Remove Grist Online Spreadsheet "
     green " 33. Install NocoDB Online Spreadsheet (Airtable alternative)"
-    red " 34. Remove NocoDB Online Spreadsheet (Airtable alternative)"
+    red " 34. Remove NocoDB Online Spreadsheet "
     green " 35. Install Etherpad collaborative editor (Word alternative)"
-    red " 36. Remove Etherpad collaborative editor (Word alternative)"
+    red " 36. Remove Etherpad collaborative editor "
     echo
     green " 41. Install Ghost Blog "
-    red " 42. Remove Ghost Blog "     
-    echo    
-    green " 47. Install Jitsi Meet video conference system"
-    red " 48. Remove Jitsi Meet video conference system"
-    green " 49. Modify Jitsi Meet whether to Start a meeting requires password authentication"
-
+    red " 42. Remove Ghost Blog "
+    green " 43. Install Joplin Server (Evernote alternative) "
+    red " 44. Remove Joplin Server "
     echo
-    green " 51. Install Air-Universe server side "
-    red " 52. Remove Air-Universe"
-    green " 53. Stop, restart, show log, manage Air-Universe server side "
-    green " 54. Using WARP (Wireguard) and IPV6 Unlock Netflix geo restriction and avoid Google reCAPTCHA"
-    green " 55. Upgrade or downgrade Air-Universe to 1.0.0 or 0.9.2, downgrade Xray to 1.5 / 1.4"
-    green " 56. Redo to get a free SSL certificate for domain name and modify Air-Universe config file ${configAirUniverseConfigFilePath}"
-    green " 58. Update geoip.dat and geosite.dat "
-    echo 
-    green " 61. Get a free SSL certificate for domain name only"
+    green " 51. Install AFFiNE Server (Notion alternative) "
+    red " 52. Remove AFFiNE Server "    
+    green " 53. Install Outline Server (Notion alternative) "
+    red " 54. Remove Outline Server "
+    echo       
+    green " 61. Install Jitsi Meet video conference system"
+    red " 62. Remove Jitsi Meet video conference system"
+    green " 63. Modify Jitsi Meet whether to Start a meeting requires password authentication"
     echo
-    green " 77. Submenu. install XrayR, V2Ray-Poseidon, Soga for V2board panel"
+    green " 65. Install Focalboard Personal Server (Trello alternative) "
+    red " 66. Remove Focalboard Personal Server "    
+    green " 67. Install Mattermost Boards Server (Trello alternative) "
+    red " 68. Remove Mattermost Boards Server "   
+    echo
+    green " 81. Install Air-Universe server side "
+    red " 82. Remove Air-Universe"
+    green " 83. Stop, restart, show log, manage Air-Universe server side "
+    green " 84. Using WARP (Wireguard) and IPV6 Unlock Netflix geo restriction and avoid Google reCAPTCHA"
+    green " 85. Upgrade or downgrade Air-Universe to 1.0.0 or 0.9.2, downgrade Xray to 1.5 / 1.4"
+    green " 86. Redo to get a free SSL certificate for domain name and modify Air-Universe config file ${configAirUniverseConfigFilePath}"
+    green " 87. Update geoip.dat and geosite.dat "
+    echo
+    green " 89. Submenu. install XrayR, V2Ray-Poseidon, Soga for V2board panel"
+    green " 90. Get a free SSL certificate for domain name only"
     echo
     green " 88. upgrade this script to latest version"
     green " 0. exit"
@@ -5394,52 +6583,78 @@ function start_menu(){
         42 )
             removeCMSGhost
         ;;
-        47 )
+        43 )
+            installJoplin
+        ;;
+        44 )
+            removeJoplin
+        ;;
+        51 )
+            installAffine
+        ;;
+        52 )
+            removeAffine
+        ;;
+        53 )
+            installOutline
+        ;;
+        54 )
+            removeOutline
+        ;;
+        61 )
             installJitsiMeet
         ;;
-        48 )
+        62 )
             removeJitsiMeet
         ;;
-        49 )
+        63 )
             secureAddPasswordForJitsiMeet
         ;;
+        65 )
+            installFocalboard
+        ;;
+        66 )
+            removeFocalboard
+        ;;
+        67 )
+            installMattermostBoards
+        ;;
+        68 )
+            removeMattermostBoards
+        ;;
 
-
-        51 )
+        81 )
             setLinuxDateZone
             installAirUniverse
         ;;
-        52 )
+        82 )
             removeAirUniverse
         ;;                                        
-        53 )
+        83 )
             manageAirUniverse
         ;;                                        
-        54 )
+        84 )
             replaceAirUniverseConfigWARP
         ;;
-        55 )
+        85 )
             downgradeXray
         ;;
-        56 )
+        86 )
             installAirUniverse "ssl"
         ;;
-        57 )
-            installAiruAndNginx
-        ;;
-        58 )
+        87 )
             updateGeoIp
         ;;
-        61 )
-            getHTTPSCertificateStep1
-        ;;
-        77 )
+        89 )
             startMenuOther
+        ;;        
+        90 )
+            getHTTPSCertificateStep1
         ;;
         88 )
             upgradeScript
         ;;
-        89 )
+        99 )
                 su - ghostsite << EOF
     echo "--------------------"
     echo "Current user: $(whoami)"
@@ -5477,18 +6692,18 @@ function setLanguage(){
     echo
     green " =================================================="
     green " Please choose your language"
-    green " 1. 中文"
-    green " 2. English"  
+    green " 1. English"
+    green " 2. 中文"  
     echo
-    read -p "Please input your language:" languageInput
+    read -r -p "Please input your language:" languageInput
     
     case "${languageInput}" in
         1 )
-            echo "cn" > ${configLanguageFilePath}
+            echo "en" > ${configLanguageFilePath}
             showMenu
         ;;
         2 )
-            echo "en" > ${configLanguageFilePath}
+            echo "cn" > ${configLanguageFilePath}
             showMenu
         ;;
         * )
@@ -5496,7 +6711,6 @@ function setLanguage(){
             setLanguage
         ;;
     esac
-
 }
 
 configLanguageFilePath="${HOME}/language_setting_v2ray_trojan.md"
