@@ -433,24 +433,50 @@ function updatePVEAptSource(){
 		green " 准备关闭企业更新源, 添加非订阅版更新源 "
 		${sudoCmd} sed -i 's|deb https://enterprise.proxmox.com/debian/pve buster pve-enterprise|#deb https://enterprise.proxmox.com/debian/pve buster pve-enterprise|g' /etc/apt/sources.list.d/pve-enterprise.list
 		${sudoCmd} sed -i 's|deb https://enterprise.proxmox.com/debian/pve bullseye pve-enterprise|#deb https://enterprise.proxmox.com/debian/pve bullseye pve-enterprise|g' /etc/apt/sources.list.d/pve-enterprise.list
+		${sudoCmd} sed -i 's|deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise|#deb https://enterprise.proxmox.com/debian/pve bookworm pve-enterprise|g' /etc/apt/sources.list.d/pve-enterprise.list
+		${sudoCmd} sed -i 's|deb https://enterprise.proxmox.com/debian/ceph-quincy bookworm enterprise|#deb https://enterprise.proxmox.com/debian/ceph-quincy bookworm enterprise|g' /etc/apt/sources.list.d/ceph.list
+
 
 		#echo 'deb http://download.proxmox.com/debian/pve buster pve-no-subscription' > /etc/apt/sources.list.d/pve-no-subscription.list
-		echo "deb https://mirrors.tuna.tsinghua.edu.cn/proxmox/debian ${osReleaseVersionCodeName} pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list
+		echo "deb http://download.proxmox.wiki/debian/pve ${osReleaseVersionCodeName} pve-no-subscription" > /etc/apt/sources.list.d/pve-no-subscription.list
+        
+		if [[ "${pveVersionShort}" == "8" ]] ; then
+		echo "deb https://mirrors.ustc.edu.cn/proxmox/debian/ceph-quincy ${osReleaseVersionCodeName} no-subscription" > /etc/apt/sources.list.d/ceph.list
+		fi
 
 		if [[ "${pveVersionShort}" == "6" ]] ; then
 			wget http://download.proxmox.com/debian/proxmox-ve-release-6.x.gpg -O /etc/apt/trusted.gpg.d/proxmox-ve-release-6.x.gpg
-		else
+		elif [[ "${pveVersionShort}" == "7" ]] ; then
 			wget https://enterprise.proxmox.com/debian/proxmox-release-bullseye.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bullseye.gpg
+		elif [[ "${pveVersionShort}" == "8" ]] ; then
+			wget https://enterprise.proxmox.com/debian/proxmox-release-bookworm.gpg -O /etc/apt/trusted.gpg.d/proxmox-release-bookworm.gpg
 		fi
-		
-		
+
 	fi
 
 
 
 	cp /etc/apt/sources.list /etc/apt/sources.list.bak
 	
-	if [[ "$osReleaseVersionNo" == "11" ]]; then
+	if [[ "$osReleaseVersionNo" == "12" ]]; then
+		cat > /etc/apt/sources.list <<-EOF
+
+deb https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName} main contrib non-free
+deb-src https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName} main contrib non-free
+
+deb https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName}-updates main contrib non-free
+deb-src https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName}-updates main contrib non-free
+
+deb https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName}-backports main non-free non-free-firmware contrib
+deb-src https://mirrors.ustc.edu.cn/debian/ ${osReleaseVersionCodeName}-backports main non-free non-free-firmware contrib
+
+deb https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main
+deb-src https://mirrors.ustc.edu.cn/debian-security/ bookworm-security main
+
+
+
+EOF
+	elif [[ "$osReleaseVersionNo" == "11" ]]; then
 		cat > /etc/apt/sources.list <<-EOF
 
 deb http://mirrors.aliyun.com/debian/ ${osReleaseVersionCodeName} main contrib non-free
@@ -462,8 +488,8 @@ deb-src http://mirrors.aliyun.com/debian/ ${osReleaseVersionCodeName}-updates ma
 deb http://mirrors.aliyun.com/debian/ ${osReleaseVersionCodeName}-backports main contrib non-free
 deb-src http://mirrors.aliyun.com/debian/ ${osReleaseVersionCodeName}-backports main contrib non-free
 
-deb https://mirrors.aliyun.com/debian-security/ bullseye-security main
-deb-src https://mirrors.aliyun.com/debian-security/ bullseye-security main
+deb https://mirrors.ustc.edu.cn/debian-security/ bullseye-security main
+deb-src https://mirrors.ustc.edu.cn/debian-security/ bullseye-security main
 
 EOF
 	else
@@ -489,8 +515,10 @@ EOF
 
 
 
-	${sudoCmd} apt dist-upgrade
-	${sudoCmd} apt-get update
+
+	${sudoCmd} apt-get update -y
+	${sudoCmd} apt update -y
+	${sudoCmd} apt dist-upgrade -y
 
 	apt install -y vim
 	green " ================================================== "
@@ -1049,8 +1077,11 @@ EOF
 
     fi
 
-
+	echo
+	update-initramfs -u -k all
+	echo
 	update-grub
+	echo
 	green " ================================================== "
 	green " 开启IOMMU成功 需要重启生效!"
 	green " 重启后 在PVE 虚拟机添加PCI设备 ${pveVfioVideoIdText} 即可实现显卡直通!"
@@ -2652,7 +2683,7 @@ function start_menu(){
     fi
 	
     green " ===================================================================================================="
-    green " PVE 虚拟机 和 群晖 工具脚本 | 2021-04-15 | By jinwyp | 系统支持：PVE / debian10 "
+    green " PVE 虚拟机 和 群晖 工具脚本 | 2023-08-17 | By jinwyp | 系统支持：PVE / debian10 "
     green " ===================================================================================================="
 	green " 1. PVE 关闭企业更新源, 添加非订阅版更新源"
 	green " 2. PVE 删除 swap 分区（/dev/pve/swap 逻辑卷) 并全部扩容给 /dev/pve/root 逻辑卷"
