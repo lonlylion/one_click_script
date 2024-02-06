@@ -544,9 +544,14 @@ function setLinuxDateZone(){
         fi
 
     else
-        $osSystemPackage install -y ntp
-        systemctl enable ntp
-        systemctl restart ntp
+        if [[ "${osReleaseVersionNoShort}" == "12" ]]; then
+            systemctl restart systemd-timesyncd
+            timedatectl timesync-status
+        else
+            $osSystemPackage install -y ntp
+            systemctl enable ntp
+            systemctl restart ntp
+        fi
     fi
 }
 
@@ -1078,10 +1083,10 @@ downloadFilenameTrojan="trojan-${versionTrojan}-linux-amd64.tar.xz"
 versionTrojanGo="0.10.6"
 downloadFilenameTrojanGo="trojan-go-linux-amd64.zip"
 
-versionV2ray="4.45.2"
+versionV2ray="5.12.1"
 downloadFilenameV2ray="v2ray-linux-64.zip"
 
-versionXray="1.7.5"
+versionXray="1.8.7"
 downloadFilenameXray="Xray-linux-64.zip"
 
 versionTrojanWeb="2.10.5"
@@ -1229,29 +1234,30 @@ function getV2rayVersion(){
 
         if [[ $configV2rayWorkingMode == "vlessTCPREALITY" ]]; then
             tempXrayVersionDisplayText="1"
-            green " 请选择 Xray 的版本, 默认直接回车为 1.8.0 或以上的最新版本"
+            green " 请选择 Xray 的版本, 默认直接回车为 1.8.7 或以上的最新版本"
             echo
-            green " 1. 1.8.0 或以上的最新版本 支持 REALITY 和 XTLS Vision"
+            green " 1. 1.8.7 或以上的最新版本 支持 REALITY 和 XTLS Vision"
 
         elif [[ $configV2rayWorkingMode == "vlessTCPVision" ]]; then
-            green " 请选择 Xray 的版本, 默认直接回车为 1.7.5 (推荐)"
+            tempXrayVersionDisplayText="1"
+            green " 请选择 Xray 的版本, 默认直接回车为 1.8.7 或以上的最新版本"
             echo
-            green " 1. 1.8.0 或以上的最新版本 支持 REALITY 和 XTLS Vision"
-            green " 2. 1.7.5 支持 XTLS Vision (推荐)"
+            green " 1. 1.8.7 或以上的最新版本 支持 REALITY 和 XTLS Vision"
+            green " 2. 1.7.5 支持 XTLS Vision "
 
         else
-            green " 请选择 Xray 的版本, 默认直接回车为 1.7.5 (推荐)"
+            green " 请选择 Xray 的版本, 默认直接回车为 1.7.5"
             echo
             if [[ $2 == "update" ]]; then
-                red "升级 1.8.0 或以上版本可能导致 启动失败, 不兼容旧版 XTLS 配置!"
+                red "升级 1.8.7 或以上版本可能导致 启动失败, 不兼容旧版 XTLS 配置!"
                 echo
-                green " 1. 1.8.0 或以上的最新版本 支持 REALITY 和 XTLS Vision"
             fi
 
             if [[ $2 == "shadowsocks" ]]; then
-                green " 1. 1.8.0 或以上的最新版本 支持 REALITY 和 XTLS Vision"
+                echo
             fi
 
+            green " 1. 1.8.7 或以上的最新版本 支持 REALITY 和 XTLS Vision"
             green " 2. 1.7.5 支持 XTLS Vision (推荐)"
             green " 3. 1.6.1 (推荐)"
             green " 4. 1.6.0"
@@ -1379,8 +1385,8 @@ configRanPath="${HOME}/ran"
 configSSLAcmeScriptPath="${HOME}/.acme.sh"
 configSSLCertPath="${configWebsiteFatherPath}/cert"
 
-configSSLCertKeyFilename="private.key"
-configSSLCertFullchainFilename="fullchain.cer"
+configSSLCertKeyFilename="server.key"
+configSSLCertFullchainFilename="server_fullchain.cert"
 
 
 function renewCertificationWithAcme(){
@@ -2527,7 +2533,7 @@ function inputNginxSNIDomain(){
 
 function inputXraySystemdServiceName(){
 
-    if [ "$1" = "v2ray_nginxOptional" ]; then
+    if [[ "$1" == "v2ray_nginxOptional" || "$1" == "nginx_v2ray" || "$1" == "v2ray" ]]; then
         echo
         green " ================================================== "
         yellow " 请输入自定义的 V2ray 或 Xray 的Systemd服务名称后缀, 默认为空"
@@ -4883,7 +4889,7 @@ EOM
 
 
 function v2rayRouteRule(){
-    site_LIST=("google" "openai" "netflix" "disney" "youtube" "spotify" "pornhub" )
+    site_LIST=("google" "openai" "twitter" "netflix" "disney" "youtube" "spotify" "pornhub" )
 
     V2rayUnlockSiteRuleV6Text=""
     V2rayUnlockSiteRuleSock5Text=""
@@ -4899,7 +4905,10 @@ function v2rayRouteRule(){
         yellow " 请选择 避免弹出 Google reCAPTCHA 人机验证的方式"
 
         elif [[ "${site}" == "openai" ]]; then
-        yellow " 请选择 解锁 OpenAI 方式"
+        yellow " 请选择 解锁 OpenAI ChatGPT 方式"
+
+        elif [[ "${site}" == "twitter" ]]; then
+        yellow " 请选择 解锁 Twitter 方式"
 
         elif [[ "${site}" == "netflix" ]]; then
         yellow " 请选择 解锁 Netflix 非自制剧的方式"
@@ -8806,7 +8815,7 @@ function start_menu(){
     if [[ ${configLanguage} == "cn" ]] ; then
 
     green " ===================================================================================================="
-    green " Trojan-go V2ray Xray 一键安装脚本 | 2023-4-10 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
+    green " Trojan-go V2ray Xray 一键安装脚本 | 2024-2-3 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
     green " ===================================================================================================="
     green " 1. 安装linux内核 bbr plus, 安装WireGuard, 用于解锁 Netflix 限制和避免弹出 Google reCAPTCHA 人机验证"
     echo
@@ -8857,7 +8866,7 @@ function start_menu(){
 
 
     green " ===================================================================================================="
-    green " Trojan-go V2ray Xray Installation | 2023-4-10 | OS support: centos7+ / debian9+ / ubuntu16.04+"
+    green " Trojan-go V2ray Xray Installation | 2024-2-3 | OS support: centos7+ / debian9+ / ubuntu16.04+"
     green " ===================================================================================================="
     green " 1. Install linux kernel,  bbr plus kernel, WireGuard and Cloudflare WARP. Unlock Netflix geo restriction and avoid Google reCAPTCHA"
     echo

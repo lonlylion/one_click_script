@@ -487,9 +487,14 @@ function setLinuxDateZone(){
         fi
 
     else
-        $osSystemPackage install -y ntp
-        systemctl enable ntp
-        systemctl restart ntp
+        if [[ "${osReleaseVersionNoShort}" == "12" ]]; then
+            systemctl restart systemd-timesyncd
+            timedatectl timesync-status
+        else
+            $osSystemPackage install -y ntp
+            systemctl enable ntp
+            systemctl restart ntp
+        fi
     fi
 }
 
@@ -1206,7 +1211,7 @@ configWebsiteFatherPath="/nginxweb"
 configSSLCertPath="${configWebsiteFatherPath}/cert"
 configSSLCertPathV2board="${configWebsiteFatherPath}/cert/v2board"
 configSSLCertKeyFilename="server.key"
-configSSLCertFullchainFilename="server.crt"
+configSSLCertFullchainFilename="server_fullchain.cert"
 
 
 
@@ -4754,7 +4759,23 @@ EOF
 
 }
 
-
+function testCMSGhost(){
+                su - ghostsite << EOF
+    echo "--------------------"
+    echo "Current user: $(whoami)"
+    whoami
+    $(whoami)
+    # ghost install --port 3468 --db=sqlite3 --no-prompt --dir ${configGhostSitePath} --url https://${configSSLDomain}
+    echo "--------------------"
+EOF
+whoami
+sudo -u ghostsite bash << EOF
+echo "In"
+whoami
+EOF
+echo "Out"
+whoami
+}
 
 
 
@@ -4919,6 +4940,7 @@ configXrayRAccessLogFilePath="${HOME}/xrayr-access.log"
 configXrayRErrorLogFilePath="${HOME}/xrayr-error.log"
 
 configXrayRConfigFilePath="/etc/XrayR/config.yml"
+configXrayRPath="/etc/XrayR"
 
 function installXrayR(){
     echo
@@ -4933,7 +4955,7 @@ function installXrayR(){
     # https://raw.githubusercontent.com/Misaka-blog/XrayR-script/master/install.sh
     # https://raw.githubusercontent.com/long2k3pro/XrayR-release/master/install.sh
 
-    wget -O xrayr_install.sh -N --no-check-certificate "https://raw.githubusercontent.com/long2k3pro/XrayR-release/master/install.sh" && chmod +x xrayr_install.sh && ./xrayr_install.sh
+    wget -O xrayr_install.sh -N --no-check-certificate "https://raw.githubusercontent.com/XrayR-project/XrayR-release/master/install.sh" && chmod +x xrayr_install.sh && ./xrayr_install.sh
 
     replaceXrayRConfig
 }
@@ -4943,66 +4965,38 @@ function replaceXrayRConfig(){
 
     if test -s ${configXrayRConfigFilePath}; then
 
-        echo
-        green "请选择SSL证书申请方式: 1 XrayR内置的http 方式, 2 通过acme.sh 申请并放置证书文件, "
-        green "默认直接回车为 XrayR内置的http自动申请模式"
-        green "选否则通过acme.sh申请证书, 支持http 和 dns 等更多模式申请证书, 推荐使用"
-        echo
-        green "注意: XrayR 的SSL证书申请方式 共有4种: 1 XrayR内置的http 方式, 2 XrayR内置的 dns 方式, 3 file 手动放置证书文件, 4 none 不申请证书"
-        green "如需要使用 XrayR内置的dns 申请SSL证书方式, 请手动修改 ${configXrayRConfigFilePath} 配置文件"
-
-        read -p "请选择SSL证书申请方式 ? 默认直接回车为http自动申请模式, 选否则手动放置证书文件同时也会自动申请证书, 请输入[Y/n]:" isSSLRequestHTTPInput
-        isSSLRequestHTTPInput=${isSSLRequestHTTPInput:-Y}
-
-        configXrayRSSLRequestMode="http"
-        if [[ $isSSLRequestHTTPInput == [Yy] ]]; then
-            echo
-            green " ================================================== "
-            yellow " 请输入绑定到本VPS的域名 例如www.xxx.com: (此步骤请关闭CDN后和nginx后安装 避免80端口占用导致申请证书失败)"
-            green " ================================================== "
-
-            read configSSLDomain
-
-        else
-            configSSLCertPath="${configSSLCertPathV2board}"
-            getHTTPSCertificateStep1
-            configXrayRSSLRequestMode="file"
-
-            sed -i "s?./cert/node1.test.com.cert?${configSSLCertPath}/${configSSLCertFullchainFilename}?g" ${configXrayRConfigFilePath}
-            sed -i "s?./cert/node1.test.com.key?${configSSLCertPath}/${configSSLCertKeyFilename}?g" ${configXrayRConfigFilePath}
-
-        fi
-
-        sed -i "s/CertMode: dns/CertMode: ${configXrayRSSLRequestMode}/g" ${configXrayRConfigFilePath}
-        sed -i 's/CertDomain: "node1.test.com"/CertDomain: "www.xxxx.net"/g' ${configXrayRConfigFilePath}
-        sed -i "s/www.xxxx.net/${configSSLDomain}/g" ${configXrayRConfigFilePath}
+        sed -i "s|# /etc/XrayR/access.Log|${configXrayRAccessLogFilePath}|g" ${configXrayRConfigFilePath}
+        sed -i "s|# /etc/XrayR/error.log|${configXrayRErrorLogFilePath}|g" ${configXrayRConfigFilePath}
+        sed -i "s|# /etc/XrayR/dns.json|/etc/XrayR/dns.json|g" ${configXrayRConfigFilePath}
+        sed -i "s|# /etc/XrayR/route.json|/etc/XrayR/route.json|g" ${configXrayRConfigFilePath}
+        # sed -i "s|# /etc/XrayR/custom_inbound.json|/etc/XrayR/custom_inbound.json|g" ${configXrayRConfigFilePath}
+        sed -i "s|# /etc/XrayR/custom_outbound.json|/etc/XrayR/custom_outbound.json|g" ${configXrayRConfigFilePath}
 
         echo
-        read -p "请选择支持的面板类型 ? 默认直接回车为V2board, 选否则SSpanel, 请输入[Y/n]:" isXrayRPanelTypeInput
+        read -r -p "请选择支持的面板类型 ? 默认直接回车为V2board, 选否则SSpanel, 请输入[Y/n]:" isXrayRPanelTypeInput
         isXrayRPanelTypeInput=${isXrayRPanelTypeInput:-Y}
         configXrayRPanelType="SSpanel"
 
         if [[ $isXrayRPanelTypeInput == [Yy] ]]; then
-            configXrayRPanelType="V2board"
-            sed -i 's/PanelType: "SSpanel"/PanelType: "V2board"/g' ${configXrayRConfigFilePath}
+            configXrayRPanelType="NewV2board"
+            sed -i 's/PanelType: "SSpanel"/PanelType: "NewV2board"/g' ${configXrayRConfigFilePath}
+        else
+            sed -i 's/PanelType: "NewV2board"/PanelType: "SSpanel"/g' ${configXrayRConfigFilePath}
         fi
-
 
         echo
         green "请输入面板域名, 例如www.123.com 不要带有http或https前缀 结尾不要带/"
-        green "请保证输入的V2board或其他面板域名支持Https 访问, 如要改成http请手动修改配置文件 ${configXrayRConfigFilePath}"
-        read -p "请输入面板域名 :" inputV2boardDomain
+        green "请保证输入的V2board或其他面板域名支持Https访问, 如要改成http请手动修改配置文件 ${configXrayRConfigFilePath}"
+        echo
+        read -r -p "请输入面板域名:" inputV2boardDomain
         sed -i "s?http://127.0.0.1:667?https://${inputV2boardDomain}?g" ${configXrayRConfigFilePath}
 
-        read -p "请输入ApiKey 即通信密钥:" inputV2boardWebApiKey
-        sed -i "s/123/${inputV2boardWebApiKey}/g" ${configXrayRConfigFilePath}
-
-        read -p "请输入节点ID (纯数字):" inputV2boardNodeId
-        sed -i "s/41/${inputV2boardNodeId}/g" ${configXrayRConfigFilePath}
-
+        echo
+        read -r -p "请输入ApiKey 即通信密钥:" inputV2boardWebApiKey
+        sed -i "s/\"123\"/\"${inputV2boardWebApiKey}\"/g" ${configXrayRConfigFilePath}
 
         echo
-        read -p "请选择支持的节点类型 ? 默认直接回车为V2ray, 选否则为Trojan, 请输入[Y/n]:" isXrayRNodeTypeInput
+        read -r -p "请选择节点协议类型: 默认直接回车为V2ray, 选否则为Trojan, 请输入[Y/n]:" isXrayRNodeTypeInput
         isXrayRNodeTypeInput=${isXrayRNodeTypeInput:-Y}
         configXrayRNodeType="V2ray"
 
@@ -5011,35 +5005,120 @@ function replaceXrayRConfig(){
             sed -i 's/NodeType: V2ray/NodeType: Trojan/g' ${configXrayRConfigFilePath}
 
         else
+            sed -i 's/NodeType: Trojan/NodeType: V2ray/g' ${configXrayRConfigFilePath}
             echo
-            read -p "是否给V2ray启用Vless协议 ? 默认直接回车选择否,默认启用Vmess协议, 选择是则启用Vless协议, 请输入[y/N]:" isXrayRVlessSupportInput
+            read -r -p "是否启用XrayR的Vless协议? 默认直接回车为否, 默认启用Vmess协议, 选择是则启用Vless协议, 请输入[y/N]:" isXrayRVlessSupportInput
             isXrayRVlessSupportInput=${isXrayRVlessSupportInput:-N}
 
             if [[ $isXrayRVlessSupportInput == [Yy] ]]; then
                 sed -i 's/EnableVless: false/EnableVless: true/g' ${configXrayRConfigFilePath}
+            else
+                sed -i 's/EnableVless: true/EnableVless: false/g' ${configXrayRConfigFilePath}
             fi
 
             echo
-            read -p "是否给V2ray启用XTLS ? 默认直接回车选择否,默认启用Tls, 选择是则启用XTLS, 请输入[y/N]:" isXrayRXTLSSupportInput
-            isXrayRXTLSSupportInput=${isXrayRXTLSSupportInput:-N}
+            read -r -p "是否启用XrayR的REALITY? 默认直接回车为否 不启用, 选择是则启用, 请输入[y/N]:" isXrayRREALITYSupportInput
+            isXrayRREALITYSupportInput=${isXrayRREALITYSupportInput:-N}
 
-            if [[ $isXrayRXTLSSupportInput == [Yy] ]]; then
-                sed -i 's/EnableXTLS: false/EnableXTLS: true/g' ${configXrayRConfigFilePath}
+            if [[ $isXrayRREALITYSupportInput == [Yy] ]]; then
+                sed -i 's/EnableREALITY: false/EnableREALITY: true/g' ${configXrayRConfigFilePath}
+            else
+                sed -i 's/EnableREALITY: true/EnableREALITY: false/g' ${configXrayRConfigFilePath}
             fi
-
         fi
 
+        echo
+        read -r -p "是否启用XrayR内置的DNS? 默认直接回车为否 不启用, 选择是则启用, 请输入[y/N]:" isXrayREnableDNSInput
+        isXrayREnableDNSInput=${isXrayREnableDNSInput:-N}
 
-        sed -i "s?# ./access.Log?${configXrayRAccessLogFilePath}?g" ${configXrayRConfigFilePath}
-        sed -i "s?# ./error.log?${configXrayRErrorLogFilePath}?g" ${configXrayRConfigFilePath}
-        sed -i "s?Level: none?Level: info?g" ${configXrayRConfigFilePath}
+        if [[ $isXrayREnableDNSInput == [Yy] ]]; then
+            sed -i 's/EnableDNS: false/EnableDNS: true/g' ${configXrayRConfigFilePath}
+            sed -i 's/DNSType: AsIs/DNSType: UseIP/g' ${configXrayRConfigFilePath}
+        else
+            sed -i 's/EnableDNS: true/EnableDNS: false/g' ${configXrayRConfigFilePath}
+            sed -i 's/DNSType: UseIP/DNSType: AsIs/g' ${configXrayRConfigFilePath}
+        fi
 
+        echo
+        read -r -p "请输入节点ID (纯数字):" inputV2boardNodeId
+        sed -i "s/NodeID: [0-9]*/NodeID: ${inputV2boardNodeId}/g" ${configXrayRConfigFilePath}
+
+
+
+        echo
+        green " =================================================="
+        yellow " 请选择SSL证书申请方式"
+        echo
+        green " 1. 关闭TLS 不申请证书, 用于配合Nginx或Caddy 等Web服务器"
+        green " 2. 通过 http 模式申请, 需要开放 80 端口"
+        green " 3. 通过 dns 模式申请, 需要填写相关dns服务商配置"
+        green " 4. 手动提供证书，需要指定证书的路径"
+        green " 5. 通过外部的acme.sh 申请证书 支持http 和 dns 等更多模式申请证书"
+        echo
+        read -r -p "请选择证书申请方式? 直接回车默认选2 http模式申请, 请输入纯数字:" isSSLRequestHTTPInput
+        isSSLRequestHTTPInput=${isSSLRequestHTTPInput:-2}
+        configXrayRSSLRequestMode="none"
+
+        if [[ $isSSLRequestHTTPInput == "1" ]]; then
+            configXrayRSSLRequestMode="none"
+
+        elif [[ $isSSLRequestHTTPInput == "2" ]]; then
+            configXrayRSSLRequestMode="http"
+            green " ================================================== "
+            yellow " 请输入指向本VPS的域名 用于申请证书 例如www.xxx.com: (此步骤请关闭CDN后和nginx后安装 避免80端口占用导致申请证书失败)"
+            green " ================================================== "
+
+            read configSSLDomain
+
+        elif [[ $isSSLRequestHTTPInput == "3" ]]; then
+            configXrayRSSLRequestMode="dns"
+            green " ================================================== "
+            yellow " 请输入绑定到本VPS的域名 例如www.xxx.com: (此步骤请关闭CDN后和nginx后安装 避免80端口占用导致申请证书失败)"
+            green " ================================================== "
+            read -r configSSLDomain
+
+            echo
+            read -r -p "请选择DNS模式申请的服务商? 默认直接回车为alidns, 选否则cloudflare, 请输入[Y/n]:" isXrayRSSLDNSProviderInput
+            isXrayRSSLDNSProviderInput=${isXrayRSSLDNSProviderInput:-Y}
+            configXrayRPanelType="alidns"
+
+            if [[ $isXrayRSSLDNSProviderInput == [Nn] ]]; then
+                configXrayRPanelType="cloudflare"
+                sed -i "s/alidns/cloudflare/g" ${configXrayRConfigFilePath}
+            fi
+
+            echo
+            read -r -p "请填写DNS模式申请的Email:" isXrayRSSLDNSEmailInput
+            sed -i "s/Email: test@me.com/Email: ${isXrayRSSLDNSEmailInput}/g" ${configXrayRConfigFilePath}
+
+        elif [[ $isSSLRequestHTTPInput == "4" ]]; then
+            configXrayRSSLRequestMode="file"
+
+        else
+            configXrayRSSLRequestMode="file"
+            configSSLCertPath="${configSSLCertPathV2board}"
+            getHTTPSCertificateStep1
+
+            sed -i "s?/etc/XrayR/cert/node1.test.com.cert?${configSSLCertPath}/${configSSLCertFullchainFilename}?g" ${configXrayRConfigFilePath}
+            sed -i "s?/etc/XrayR/cert/node1.test.com.key?${configSSLCertPath}/${configSSLCertKeyFilename}?g" ${configXrayRConfigFilePath}
+        fi
+
+        sed -i "s/CertMode: dns/CertMode: ${configXrayRSSLRequestMode}/g" ${configXrayRConfigFilePath}
+        sed -i "s/CertDomain: \"node1.test.com\"/CertDomain: \"${configSSLDomain}\"/g" ${configXrayRConfigFilePath}
+
+
+        sed -i "18,22d" ${configXrayRPath}/route.json
+        # mv ${configXrayRPath}/custom_inbound.json ${configXrayRPath}/custom_inbound_bak.json
 
         XrayR restart
 
+        (crontab -l ; echo "36 4 * * 0,1,2,3,4,5,6 systemctl restart XrayR.service ") | sort - | uniq - | crontab -
+
+        warpGoCrontab
     fi
 
     manageXrayR
+
 }
 
 
@@ -5070,11 +5149,58 @@ function editXrayRConfig(){
 
 
 
+function warpGoCrontab(){
 
+    cat > /root/check_ipv6_warp-go-cron.sh <<-EOF
+#!/bin/bash
 
+# check ipv6 network connectivity
+if ping6 -c 4 2001:4860:4860::8888 > /dev/null; then
+    echo "IPv6 network is connected"
+else
+    echo "IPv6 network is unreachable"
+    /usr/bin/warp-go o
+    sleep 2
 
+    if ping6 -c 4 2001:4860:4860::8888 > /dev/null; then
+        echo "IPv6 network is connected"
+    else
+        echo "IPv6 network is unreachable"
+        /usr/bin/warp-go o
+        sleep 2
+    fi
+fi
+EOF
 
+    chmod +x /root/check_ipv6_warp-go-cron.sh
 
+    # create a cron job
+    (crontab -l ; echo "50 4 * * 0,1,2,3,4,5,6 /root/check_ipv6_warp-go-cron.sh ") | sort - | uniq - | crontab -
+
+    echo "warp-go Crontab added"
+
+}
+
+function warpGoCheckIpv6(){
+    ipv6_address="2001:4860:4860::8888"
+    ping_command="ping6 -c 4 $ipv6_address"
+
+    # check ipv6 network connectivity
+    if ping6 -c 4 $ipv6_address > /dev/null; then
+        echo "IPv6 network is connected"
+    else
+        echo "IPv6 network is unreachable"
+        /usr/bin/warp-go o
+        sleep 2
+        if ping6 -c 4 $ipv6_address > /dev/null; then
+            echo "IPv6 network is connected"
+        else
+            echo "IPv6 network is unreachable"
+            /usr/bin/warp-go o
+            sleep 2
+        fi
+    fi
+}
 
 
 
@@ -5117,20 +5243,12 @@ function installAiruAndNginx(){
 
 
 
-
-
-
-
-
-
-
 function downgradeXray(){
     echo
     green " =================================================="
     green "  准备降级 Xray 和 Air-Universe !"
     green " =================================================="
     echo
-
 
     yellow " 请选择 Air-Universe 降级到的版本, 默认不降级"
     red " 注意 Air-Universe 最新版不支持 Xray 1.5.0或更老版本"
@@ -6350,6 +6468,7 @@ function startMenuOther(){
         green " 21. 安装 XrayR 服务器端"
         green " 22. 停止, 重启, 查看日志等, 管理 XrayR 服务器端"
         green " 23. 编辑 XrayR 配置文件 ${configXrayRConfigFilePath}"
+        green " 24. 通过向导修改 XrayR 配置文件 ${configXrayRConfigFilePath}"
         echo
         green " 41. 安装 Soga 服务器端"
         green " 42. 停止, 重启, 查看日志等, 管理 Soga 服务器端"
@@ -6370,6 +6489,7 @@ function startMenuOther(){
         green " 21. Install XrayR server side "
         green " 22. Stop, restart, show log, manage XrayR server side "
         green " 23. Using VI open XrayR config file ${configXrayRConfigFilePath}"
+        green " 24. Step by Step to modify XrayR config file ${configXrayRConfigFilePath}"
         echo
         green " 41. Install Soga server side "
         green " 42. Stop, restart, show log, manage Soga server side "
@@ -6388,7 +6508,7 @@ function startMenuOther(){
 
 
     echo
-    read -p "Please input number:" menuNumberInput
+    read -r -p "Please input number:" menuNumberInput
     case "$menuNumberInput" in
         21 )
             setLinuxDateZone
@@ -6399,6 +6519,9 @@ function startMenuOther(){
         ;;
         23 )
             editXrayRConfig
+        ;;
+        24 )
+            replaceXrayRConfig
         ;;
         41 )
             setLinuxDateZone
@@ -6463,7 +6586,7 @@ function start_menu(){
 
     if [[ ${configLanguage} == "cn" ]] ; then
     green " =================================================="
-    green " Linux 常用工具 一键安装脚本 | 2023-7-10 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
+    green " Linux 常用工具 一键安装脚本 | 2024-2-4 | 系统支持：centos7+ / debian9+ / ubuntu16.04+"
     green " =================================================="
     green " 1. 安装 linux 内核 BBR Plus, 安装 WireGuard, 用于解锁 Netflix 限制 和避免弹出 Google reCAPTCHA 人机验证"
     echo
@@ -6530,7 +6653,7 @@ function start_menu(){
 
     else
     green " =================================================="
-    green " Linux tools installation script | 2023-7-10 | OS support：centos7+ / debian9+ / ubuntu16.04+"
+    green " Linux tools installation script | 2024-2-4 | OS support：centos7+ / debian9+ / ubuntu16.04+"
     green " =================================================="
     green " 1. Install linux kernel,  bbr plus kernel, WireGuard and Cloudflare WARP. Unlock Netflix geo restriction and avoid Google reCAPTCHA"
     echo
@@ -6753,25 +6876,22 @@ function start_menu(){
         90 )
             getHTTPSCertificateStep1
         ;;
+        91 )
+            setLinuxDateZone
+            installXrayR
+        ;;
+        92 )
+            replaceXrayRConfig
+        ;;
+        96 )
+            warpGoCheckIpv6
+            warpGoCrontab
+        ;;
         88 )
             upgradeScript
         ;;
-        99 )
-                su - ghostsite << EOF
-    echo "--------------------"
-    echo "Current user: $(whoami)"
-    whoami
-    $(whoami)
-    # ghost install --port 3468 --db=sqlite3 --no-prompt --dir ${configGhostSitePath} --url https://${configSSLDomain}
-    echo "--------------------"
-EOF
-whoami
-sudo -u ghostsite bash << EOF
-echo "In"
-whoami
-EOF
-echo "Out"
-whoami
+        98 )
+            testCMSGhost
         ;;
         0 )
             exit 1
