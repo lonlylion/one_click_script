@@ -942,8 +942,14 @@ function downloadFile(){
     if [ -f "${userHomePath}/${linuxKernelToInstallVersionFull}/${tempFilename}" ]; then
         green "文件已存在, 不需要下载, 文件原下载地址: $1 "
     else
-        green "文件下载中... 下载地址: $1 "
+        green "文件下载中... Path: $1 "
         wget -N --no-check-certificate -P ${userHomePath}/${linuxKernelToInstallVersionFull} $1
+        if [ $? -eq 0 ]; then
+            green "文件下载成功. ${userHomePath}/${linuxKernelToInstallVersionFull}/${tempFilename}"
+        else
+            red "文件下载失败, 请检查网络或者手动下载文件到目录 ${userHomePath}/${linuxKernelToInstallVersionFull} "
+            promptContinueOpeartion
+        fi
     fi
     echo
 }
@@ -1077,19 +1083,24 @@ function getLatestCentosKernelVersion(){
             # https://stackoverflow.com/questions/229551/how-to-check-if-a-string-contains-a-substring-in-bash
             for ver in "${elrepo_kernel_version_ml_teddysun_ftp_array_lts[@]}"; do
 
-                if [[ ${ver} == *"5.10"* ]]; then
+                if [[ ${ver} == *"5.10.222"* ]]; then
                     # echo "符合所选版本的Linux 5.10 内核版本: ${ver}"
                     elrepo_kernel_version_ml_Teddysun510=${ver}
                 fi
 
-                if [[ ${ver} == *"5.15"* ]]; then
+                if [[ ${ver} == *"5.15.163"* ]]; then
                     # echo "符合所选版本的Linux 5.15 内核版本: ${ver}"
                     elrepo_kernel_version_ml_Teddysun515=${ver}
                 fi
 
-                if [[ ${ver} == *"6.1"* ]]; then
+                if [[ ${ver} == *"6.1.100"* ]]; then
                     # echo "符合所选版本的Linux 6.1 内核版本: ${ver}"
                     elrepo_kernel_version_ml_Teddysun61=${ver}
+                fi
+
+                if [[ ${ver} == *"6.6.41"* ]]; then
+                    # echo "符合所选版本的Linux 6.1 内核版本: ${ver}"
+                    elrepo_kernel_version_ml_Teddysun66=${ver}
                 fi
 
                 if [[ ${ver} == *"${elrepo_kernel_version_ml_Teddysun_latest_version}"* ]]; then
@@ -1100,8 +1111,10 @@ function getLatestCentosKernelVersion(){
             done
 
             green "Centos elrepo 源的最新的Linux 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml}"
+            green "由 Teddysun 编译的 Centos 最新的Linux 5.10 LTS 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun510}"
             green "由 Teddysun 编译的 Centos 最新的Linux 5.15 LTS 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun515}"
             green "由 Teddysun 编译的 Centos 最新的Linux 6.1 LTS 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun61}"
+            green "由 Teddysun 编译的 Centos 最新的Linux 6.6 LTS 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun66}"
             green "由 Teddysun 编译的 Centos 最新的Linux 6.xx 内核 kernel-ml 版本号为 ${elrepo_kernel_version_ml_Teddysun_latest}"
 
         fi
@@ -1263,6 +1276,12 @@ function installCentosKernelManual(){
         elif [ "${linuxKernelToInstallVersion}" = "6.1" ]; then
             elrepo_kernel_name="kernel-ml"
             elrepo_kernel_version=${elrepo_kernel_version_ml_Teddysun61}
+            elrepo_kernel_filename=""
+            ELREPODownloadUrl="https://dl.lamp.sh/kernel/el${osReleaseVersionNoShort}"
+
+        elif [ "${linuxKernelToInstallVersion}" = "6.6" ]; then
+            elrepo_kernel_name="kernel-ml"
+            elrepo_kernel_version=${elrepo_kernel_version_ml_Teddysun66}
             elrepo_kernel_filename=""
             ELREPODownloadUrl="https://dl.lamp.sh/kernel/el${osReleaseVersionNoShort}"
 
@@ -1818,16 +1837,13 @@ function installDebianUbuntuKernel(){
             green " 开始安装 linux 内核版本: XanMod ${linuxKernelToInstallVersionFull}"
             echo
 
-            if [ "${linuxKernelToInstallVersion}" = "5.15" ]; then
-                ${sudoCmd} apt install -y linux-xanmod-lts
-            elif [ "${linuxKernelToInstallVersion}" = "6.2" ]; then
-                ${sudoCmd} apt install -y linux-xanmod-x64v3
-            elif [ "${linuxKernelToInstallVersion}" = "6.1" ]; then
+            if [ "${linuxKernelToInstallVersion}" = "6.6" ]; then
                 ${sudoCmd} apt install -y linux-xanmod-lts-x64v3
+            elif [ "${linuxKernelToInstallVersion}" = "6.11" ]; then
+                ${sudoCmd} apt install -y linux-xanmod-x64v3
             else
                 ${sudoCmd} apt install -y linux-xanmod
             fi
-
 
             listInstalledLinuxKernel
             rebootSystem
@@ -1835,6 +1851,9 @@ function installDebianUbuntuKernel(){
 
             if [ "${linuxKernelToInstallVersion}" = "5.10" ]; then
                 debianKernelVersion="5.10.0-0"
+                if [ "${osReleaseVersionNo}" = "11" ]; then
+                    debianKernelVersion="5.10.0-16"
+                fi
                 # linux-image-5.10.0-0.bpo.15-amd64
             elif [ "${linuxKernelToInstallVersion}" = "5.19" ]; then
                 debianKernelVersion="5.16.0-0"
@@ -1844,10 +1863,22 @@ function installDebianUbuntuKernel(){
 
             elif [ "${linuxKernelToInstallVersion}" = "4.19" ]; then
                 debianKernelVersion="4.19.0-21"
-            else
+
+            elif [ "${linuxKernelToInstallVersion}" = "6.1" ]; then
                 debianKernelVersion="6.1.0-0"
                 if [ "${osReleaseVersionNo}" = "11" ]; then
-                    debianKernelVersion="6.1.0-0"
+                    debianKernelVersion="6.1.0-20"
+                fi
+                if [ "${osReleaseVersionNo}" = "12" ]; then
+                    debianKernelVersion="6.1.0-25"
+                fi
+            else
+                debianKernelVersion="6.6.0-0"
+                if [ "${osReleaseVersionNo}" = "11" ]; then
+                    debianKernelVersion="6.6.0-0"
+                fi
+                if [ "${osReleaseVersionNo}" = "12" ]; then
+                    debianKernelVersion="6.6.0-0"
                 fi
             fi
 
@@ -1883,7 +1914,8 @@ function installDebianUbuntuKernel(){
             echo
             echo "dpkg --get-selections | grep linux-image-${debianKernelVersion} | awk '/linux-image-[4-9]./{print \$1}' | awk -F'linux-image-' '{print \$2}' "
             #debianKernelVersionPackageName=$(dpkg --get-selections | grep "${debianKernelVersion}" | awk '/linux-image-[4-9]./{print $1}' | awk -F'linux-image-' '{print $2}')
-            debianKernelVersionPackageName=$(apt-cache search linux-image | grep "${debianKernelVersion}" | awk '/linux-image-[4-9]./{print $1}' | awk '/[0-9]-amd64$/{print $1}' | awk -F'linux-image-' '{print $2}' | tail -1)
+            echo "apt-cache search linux-image | grep ${debianKernelVersion} | awk '/linux-image-[4-9]\.[0-9]+\.[0-9]+/{print \$1}' | awk '/[0-9]+-amd64$/{print \$1}' | awk -F'linux-image-' '{print \$2}' | sort -V | tail -1"
+            debianKernelVersionPackageName=$(apt-cache search linux-image | grep "${debianKernelVersion}" | awk '/linux-image-[4-9]\.[0-9]+\.[0-9]+/{print $1}' | awk '/[0-9]+-amd64$/{print $1}' | awk -F'linux-image-' '{print $2}' | sort -V | tail -1)
 
 
             echo
@@ -3262,7 +3294,7 @@ function start_menu(){
 
     if [[ ${configLanguage} == "cn" ]] ; then
     green " =================================================="
-    green " Linux 内核 一键安装脚本 | 2024-07-25 | 系统支持：centos7+ / debian10+ / ubuntu16.04+"
+    green " Linux 内核 一键安装脚本 | 2024-09-25 | 系统支持：centos7+ / debian10+ / ubuntu16.04+"
     green " Linux 内核 4.9 以上都支持开启BBR, 如要开启BBR Plus 则需要安装支持BBR Plus的内核 "
     red " 在任何生产环境中请谨慎使用此脚本, 升级内核有风险, 请做好备份！在某些VPS会导致无法启动! "
     green " =================================================="
@@ -3314,7 +3346,8 @@ function start_menu(){
     green " 36. 安装 内核 5.10 LTS, Teddysun 编译 推荐安装"
     green " 37. 安装 内核 5.15 LTS, Teddysun 编译 推荐安装"
     green " 38. 安装 内核 6.1 LTS, Teddysun 编译 下载安装. "
-    green " 39. 安装 内核 6.3, elrepo 官方编译. "
+    green " 39. 安装 内核 6.6 LTS, Teddysun 编译 下载安装. "
+    green " 40. 安装 内核 6.11 , elrepo 官方编译. "
 
     else
         if [[ "${osRelease}" == "debian" ]]; then
@@ -3327,6 +3360,9 @@ function start_menu(){
                 green " 42. 安装 内核 5.19, 通过 Debian 官方源安装"
                 green " 43. 安装 最新版本内核 6.1 或更高, 通过 Debian 官方源安装"
             fi
+            if [[ "${osReleaseVersion}" == "12" ]]; then
+                green " 43. 安装 LTS内核 6.1 LTS, 通过 Debian 官方源安装"
+            fi
             echo
         fi
 
@@ -3337,8 +3373,8 @@ function start_menu(){
         green " 48. 安装 内核 5.19, 通过 Ubuntu kernel mainline 安装"
         green " 49. 安装 最新版本内核 6.1, 通过 Ubuntu kernel mainline 安装"
         echo
-        green " 51. 安装 XanMod Kernel 内核 6.1 LTS, 官方源安装 "
-        green " 52. 安装 XanMod Kernel 内核 6.2, 官方源安装 "
+        green " 51. 安装 XanMod Kernel 内核 6.6 LTS, 官方源安装 "
+        green " 52. 安装 XanMod Kernel 内核 6.11, 官方源安装 "
 
     fi
 
@@ -3359,7 +3395,7 @@ function start_menu(){
     else
 
     green " =================================================="
-    green " Linux kernel install script | 2024-07-25 | OS support：centos7+ / debian10+ / ubuntu16.04+"
+    green " Linux kernel install script | 2024-09-25 | OS support：centos7+ / debian10+ / ubuntu16.04+"
     green " Enable bbr require linux kernel higher than 4.9. Enable bbr plus require special bbr plus kernel "
     red " Please use this script with caution in production. Backup your data first! Upgrade linux kernel will cause VPS unable to boot sometimes."
     green " =================================================="
@@ -3409,7 +3445,8 @@ function start_menu(){
     green " 36. Install linux kernel 5.10 LTS, compile by Teddysun. Recommended"
     green " 37. Install linux kernel 5.15 LTS, compile by Teddysun. Recommended"
     green " 38. Install linux kernel 6.1 LTS compile by Teddysun. Recommended"
-    green " 39. Install linux kernel 6.3, compile by elrepo "
+    green " 39. Install linux kernel 6.6 LTS compile by Teddysun. Recommended"
+    green " 40. Install linux kernel 6.11, compile by elrepo "
     else
         if [[ "${osRelease}" == "debian" ]]; then
             if [[ "${osReleaseVersion}" == "10" ]]; then
@@ -3421,6 +3458,9 @@ function start_menu(){
                 green " 42. Install linux kernel, 5.19, from Debian repository source"
                 green " 43. Install latest linux kernel, 6.1 or higher, from Debian repository source"
             fi
+            if [[ "${osReleaseVersion}" == "12" ]]; then
+                green " 43. Install LTS linux kernel, 6.1 LTS, from Debian repository source"
+            fi
             echo
         fi
 
@@ -3431,8 +3471,8 @@ function start_menu(){
     green " 48. Install linux kernel 5.19, download and install from Ubuntu kernel mainline"
     green " 49. Install latest linux kernel 6.1, download and install from Ubuntu kernel mainline"
     echo
-    green " 51. Install XanMod kernel 6.1 LTS, from XanMod repository source "
-    green " 52. Install XanMod kernel 6.2, from XanMod repository source "
+    green " 51. Install XanMod kernel 6.6 LTS, from XanMod repository source "
+    green " 52. Install XanMod kernel 6.11, from XanMod repository source "
     fi
 
     echo
@@ -3557,7 +3597,11 @@ function start_menu(){
             installKernel
         ;;
         39 )
-            linuxKernelToInstallVersion="6.3"
+            linuxKernelToInstallVersion="6.6"
+            installKernel
+        ;;
+        40 )
+            linuxKernelToInstallVersion="6.11"
             installKernel
         ;;
         41 )
@@ -3600,13 +3644,13 @@ function start_menu(){
             installKernel
         ;;
         51 )
-            linuxKernelToInstallVersion="6.1"
+            linuxKernelToInstallVersion="6.6"
             linuxKernelToBBRType="xanmod"
             isInstallFromRepo="yes"
             installKernel
         ;;
         52 )
-            linuxKernelToInstallVersion="6.2"
+            linuxKernelToInstallVersion="6.11"
             linuxKernelToBBRType="xanmod"
             isInstallFromRepo="yes"
             installKernel
