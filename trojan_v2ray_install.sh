@@ -596,6 +596,27 @@ function installSoftDownload(){
             ${sudoCmd} dnf distro-sync -y
         fi
 
+
+        if [[ ${osInfo} == "AlmaLinux" ]]; then
+
+            # 定义要检查的 GPG 密钥 ID
+            KEY_ID="ced7258b"
+
+            # 使用 rpm -qi 命令检查是否安装了指定的 GPG 密钥
+            rpm -qi "gpg-pubkey-$KEY_ID" &>/dev/null
+
+            # 检查命令的退出状态码
+            if [ $? -eq 0 ]; then
+                # red "GPG key with ID $KEY_ID is installed."
+                echo
+            else
+                red "GPG key with ID $KEY_ID is NOT installed."
+                ${sudoCmd} rpm --import https://repo.almalinux.org/almalinux/RPM-GPG-KEY-AlmaLinux
+                ${sudoCmd} dnf clean all
+                ${sudoCmd} dnf makecache
+            fi
+        fi
+
         PACKAGE_LIST_Centos=( "wget" "curl" "git" "unzip" "glibc-langpack-en" )
 
         # 检查所有软件包是否已安装
@@ -890,7 +911,6 @@ function vps_netflix(){
     # bash <(curl -L -s https://raw.githubusercontent.com/lmc999/RegionRestrictionCheck/main/check.sh)
 
     # wget -N --no-check-certificate https://github.com/CoiaPrant/Netflix_Unlock_Information/raw/main/netflix.sh && chmod +x netflix.sh && ./netflix.sh
-    # wget -N --no-check-certificate -O netflixcheck https://github.com/sjlleo/netflix-verify/releases/download/2.61/nf_2.61_linux_amd64 && chmod +x ./netflixcheck && ./netflixcheck -method full
 
     wget -N --no-check-certificate -O ./netflix.sh https://github.com/CoiaPrant/MediaUnlock_Test/raw/main/check.sh && chmod +x ./netflix.sh && ./netflix.sh
 }
@@ -905,15 +925,20 @@ function vps_netflix_jin(){
 }
 
 
-
 function vps_netflixgo(){
-    wget -qN --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/v3.1.0-1/nf_linux_amd64 && chmod +x ./netflixGo && ./netflixGo
-    # wget -qN --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/2.61/nf_2.61_linux_amd64 && chmod +x ./netflixGo && ./netflixGo -method full
+    wget -N --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/v3.1.0-1/nf_linux_amd64 && chmod +x ./netflixGo && ./netflixGo
+    # wget -N --no-check-certificate -O netflixGo https://github.com/sjlleo/netflix-verify/releases/download/2.61/nf_2.61_linux_amd64 && chmod +x ./netflixGo && ./netflixGo -method full
     echo
     echo
     wget -qN --no-check-certificate -O disneyplusGo https://github.com/sjlleo/VerifyDisneyPlus/releases/download/1.01/dp_1.01_linux_amd64 && chmod +x ./disneyplusGo && ./disneyplusGo
 }
 
+
+function vps_bench_ecs(){
+    curl -L https://github.com/spiritLHLS/ecs/raw/main/ecs.sh -o ecs.sh && chmod +x ecs.sh && bash ecs.sh
+    # bash <(wget -qO- bash.spiritlhl.net/ecs)
+    # wget -N --no-check-certificate https://raw.githubusercontent.com/spiritLHLS/ecs/refs/heads/main/ecs.sh && chmod +x ecs.sh && ./ecs.sh
+}
 
 function vps_superspeed(){
     bash <(curl -Lso- https://git.io/superspeed_uxh)
@@ -4954,7 +4979,7 @@ EOM
 
 
 function v2rayRouteRule(){
-    site_LIST=("google" "openai" "twitter" "netflix" "disney" "youtube" "spotify" "pornhub" )
+    site_LIST=("google" "openai" "anthropic" "twitter" "netflix" "disney" "youtube" "spotify" "pornhub" )
 
     V2rayUnlockSiteRuleV6Text=""
     V2rayUnlockSiteRuleSock5Text=""
@@ -4971,6 +4996,9 @@ function v2rayRouteRule(){
 
         elif [[ "${site}" == "openai" ]]; then
         yellow " 请选择 解锁 OpenAI ChatGPT 方式"
+
+        elif [[ "${site}" == "anthropic" ]]; then
+        yellow " 请选择 解锁 Anthropic Claude AI 方式"
 
         elif [[ "${site}" == "twitter" ]]; then
         yellow " 请选择 解锁 Twitter 方式"
@@ -5008,23 +5036,16 @@ function v2rayRouteRule(){
         isV2rayUnlockGoogleInput=${isV2rayUnlockGoogleInput:-1}
 
         V2rayUnlockSiteRuleTempText=", \"geosite:${site}\" "
-        if [[ "${site}" == "others" ]]; then
-            V2rayUnlockSiteRuleTempText=", \"geosite:${site}\" "
-        fi
 
         if [[ $isV2rayUnlockGoogleInput == "2" ]]; then
-
             V2rayUnlockSiteRuleV6Text+="${V2rayUnlockSiteRuleTempText}"
 
         elif [[ $isV2rayUnlockGoogleInput == "3" ]]; then
-
             V2rayUnlockSiteRuleSock5Text+="${V2rayUnlockSiteRuleTempText}"
-
             inputUnlockWARPSock5Server
 
         elif [[ $isV2rayUnlockGoogleInput == "4" ]]; then
             V2rayUnlockSiteRuleV2rayServerText+="${V2rayUnlockSiteRuleTempText}"
-
             inputUnlockV2rayServerInfo
         else
             echo ""
@@ -8986,6 +9007,7 @@ EOM
 
 
 function firewallForbiden(){
+    # 禁止邮件端口
     # firewall-cmd --permanent --direct --add-rule ipv4 filter OUTPUT 0 -p tcp -m tcp --dport=25 -j ACCEPT
     # firewall-cmd --permanent --direct --add-rule ipv4 filter OUTPUT 1 -p tcp -m tcp --dport=25 -j REJECT
     # firewall-cmd --reload
@@ -9029,6 +9051,7 @@ function startMenuOther(){
     echo
     green " =================================================="
     red " 以下是 VPS 测网速工具, 脚本测速会消耗大量 VPS 流量，请悉知！"
+    green " 40. 融合怪测评脚本 spiritLHLS/ecs "
     green " 41. superspeed 三网纯测速 （全国各地三大运营商部分节点全面测速）推荐使用 "
     green " 42. yet-another-bench-script 综合测试 （包含 CPU IO 测试 国际多个数据节点网速测试）推荐使用"
     green " 43. 由teddysun 编写的Bench 综合测试 （包含系统信息 IO 测试 国内多个数据节点网速测试）"
@@ -9077,6 +9100,7 @@ function startMenuOther(){
     echo
     green " =================================================="
     red " VPS speedtest tools. Pay attention that speed tests will consume lots of traffic."
+    green " 40. VPS_Fusion_Monster_Server_Test_Script by spiritLHLS/ecs "
     green " 41. superspeed. ( China telecom / China unicom / China mobile node speed test ) "
     green " 42. yet-another-bench-script ( CPU IO Memory Network speed test)"
     green " 43. Bench by teddysun"
@@ -9142,6 +9166,9 @@ function startMenuOther(){
         ;;
         10 )
             removeXUI
+        ;;
+        40 )
+            vps_bench_ecs
         ;;
         41 )
             vps_superspeed
