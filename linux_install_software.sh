@@ -2251,16 +2251,19 @@ function installWebServerNginx(){
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2290,9 +2293,7 @@ function installWebServerNginx(){
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
-        }
+
     }
 
 EOF
@@ -2304,16 +2305,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2346,9 +2350,6 @@ EOF
             allow all;
             root ${configGhostSitePath}/system/nginx-root;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
-        }
 
         location / {
             proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -2378,16 +2379,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2419,11 +2423,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
-        }
 
-        return 301 https://$configSSLDomain\$request_uri;
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
+        }
     }
 
 EOF
@@ -2440,16 +2443,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2477,6 +2483,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2486,10 +2493,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 
 EOF
@@ -2500,16 +2507,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2532,6 +2542,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2541,10 +2552,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2555,16 +2566,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2586,6 +2600,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2595,10 +2610,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2609,16 +2624,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2641,6 +2659,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2650,10 +2669,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2664,16 +2683,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2696,6 +2718,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2705,10 +2728,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2718,16 +2741,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2750,6 +2776,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2759,10 +2786,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2778,16 +2805,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2843,6 +2873,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2852,10 +2883,10 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
+
+        location / {
+            return 301 https://$configSSLDomain\$request_uri;
         }
-        return 301 https://$configSSLDomain\$request_uri;
     }
 EOF
 
@@ -2873,16 +2904,19 @@ EOF
     server {
         listen 443 ssl;
         listen [::]:443 ssl;
-        # http2  on;
+        http2 on;
+
         server_name  $configSSLDomain;
 
         ssl_certificate       ${configSSLCertPath}/$configSSLCertFullchainFilename;
         ssl_certificate_key   ${configSSLCertPath}/$configSSLCertKeyFilename;
-        ssl_protocols         TLSv1.2 TLSv1.3;
-        ssl_ciphers           TLS-AES-256-GCM-SHA384:TLS-CHACHA20-POLY1305-SHA256:TLS-AES-128-GCM-SHA256:TLS-AES-128-CCM-8-SHA256:TLS-AES-128-CCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256;
 
-        # Config for 0-RTT in TLSv1.3
-        ssl_early_data on;
+        ssl_protocols         TLSv1.2 TLSv1.3;
+        ssl_ciphers           ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:1m;
+
+        # OCSP Stapling (提升SSL性能)
         ssl_stapling on;
         ssl_stapling_verify on;
         add_header Strict-Transport-Security "max-age=31536000";
@@ -2929,6 +2963,7 @@ EOF
     server {
         listen 80;
         listen [::]:80;
+
         server_name  $configSSLDomain;
         root $configWebsitePath;
         index index.php index.html index.htm;
@@ -2938,9 +2973,7 @@ EOF
             allow all;
             root $configWebsitePath;
         }
-        location = /.well-known/acme-challenge/ {
-            return 404;
-        }
+
         location / {
             proxy_set_header Range \$http_range;
             proxy_set_header If-Range \$http_if_range;
@@ -6461,7 +6494,7 @@ EOM
             "protocol": "blackhole",
             "settings": {
                 "response": {
-                    "type": "http"
+                    "type": "none"
                 }
             }
         },

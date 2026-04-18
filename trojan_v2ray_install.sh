@@ -2948,7 +2948,7 @@ function downloadTrojanBin(){
         downloadAndUnzip "https://github.com/fregie/trojan-go/releases/download/v${versionTrojanGo}/${downloadFilenameTrojanGo}" "${configTrojanBasePath}" "${downloadFilenameTrojanGo}"
 
     else
-        downloadFilenameTrojanGo="trojan-go-fork-linux-amd64.zip"
+        downloadFilenameTrojanGo="trojan-go-fork-linux-amd64-v2.zip"
         if [[ ${osArchitecture} == "arm" ]] ; then
             downloadFilenameTrojanGo="trojan-go-fork-linux-arm.zip"
         fi
@@ -3820,7 +3820,6 @@ EOF
     cat "${configSSRustPath}/clientConfig.json"
     echo
 
-
 }
 
 
@@ -3904,8 +3903,9 @@ fi
     yellow " 屏蔽中国回国流量, 可以有效防止GFW的检测, 如果挂代理访问中国国内网站 则很容易2次过墙而被检测"
     echo
     green " 1. 屏蔽中国回国流量"
-    green " 2. 不屏蔽中国回国流量"
-    green " 3. 中国回国流量走 WARP IPv6 解锁"
+    green " 2. 不屏蔽中国回国流量 走 IPv4 解锁"
+    green " 3. 中国回国流量走 IPv6 解锁"
+    green " 4. 中国回国流量走 WARP Sock5 解锁 "
     echo
     green " 默认选1 屏蔽回国流量. 选择3 需要安装好 Wireguard 和 Cloudflare WARP, 可重新运行本脚本选择第一项安装WARP".
     red " 推荐先安装 Wireguard 与 Cloudflare WARP 后,再安装v2ray或xray. 实际上先安装v2ray或xray, 后安装Wireguard 与 Cloudflare WARP也没问题"
@@ -3915,16 +3915,17 @@ fi
 
     V2rayBlockChinaSiteRuleText="blocked_out"
 
-
-    if [[ $isV2rayBlockChinaSiteInput == "1" ]]; then
-        V2rayBlockChinaSiteRuleText="blocked_out"
-
-    elif [[ $isV2rayBlockChinaSiteInput == "2" ]]; then
+    if [[ $isV2rayBlockChinaSiteInput == "2" ]]; then
         V2rayBlockChinaSiteRuleText="IPv4_out"
 
-    else
+    elif [[ $isV2rayBlockChinaSiteInput == "3" ]]; then
         V2rayBlockChinaSiteRuleText="IPv6_out"
 
+    elif [[ $isV2rayBlockChinaSiteInput == "4" ]]; then
+        V2rayBlockChinaSiteRuleText="WARP_out"
+
+    else
+        V2rayBlockChinaSiteRuleText="blocked_out"
     fi
 
 
@@ -3941,19 +3942,19 @@ fi
     "routing": {
         "domainStrategy": "IPIfNonMatch",
         "rules": [
-
             {
                 "type": "field",
-                "domain": [
-                    "geosite:cn"
-                ],
+                "domain": [ "geosite:google-cn"],
+                "outboundTag": "IPv4_out"
+            },
+            {
+                "type": "field",
+                "domain": [ "geosite:cn" ],
                 "outboundTag": "${V2rayBlockChinaSiteRuleText}"
             },
             {
                 "type": "field",
-                "ip": [
-                    "geoip:cn"
-                ],
+                "ip": [ "geoip:cn" ],
                 "outboundTag": "${V2rayBlockChinaSiteRuleText}"
             },
             {
@@ -3976,7 +3977,7 @@ fi
             "protocol": "blackhole",
             "settings": {
                 "response": {
-                    "type": "http"
+                    "type": "none"
                 }
             }
         },
@@ -4197,19 +4198,35 @@ function generateXrayRealityShortId() {
     done
 }
 
+# Parse xray x25519 key output into xrayRealityPrivateKey and xrayRealityPublicKey.
+# Supports two formats:
+#   Old (< 25.3.6): "Private key: <key>" / "Public key: <key>"
+#   New (>= 25.3.6): "PrivateKey: <key>" / "Password: <key>" / "Hash32: <key>"
+# Uses grep to match by field name rather than by line position.
+function parseXrayRealityKeys(){
+    xrayRealityPrivateKey=$(echo "${xrayRealityX25519Key}" | grep -i "^Private" | awk '{print $NF}')
+
+    # xray >= 25.3.6 renamed "Public key" to "Password" to avoid misunderstanding
+    local _password
+    _password=$(echo "${xrayRealityX25519Key}" | grep "^Password:" | awk '{print $NF}')
+    if [[ -n "${_password}" ]]; then
+        xrayRealityPublicKey="${_password}"
+    else
+        xrayRealityPublicKey=$(echo "${xrayRealityX25519Key}" | grep -i "^Public" | awk '{print $NF}')
+    fi
+}
+
 function generateXrayRealityPrivateKey(){
 
     if [[ -f "${configxrayRealityKeyFilePath}" ]]; then
         xrayRealityX25519Key=$(cat ${configxrayRealityKeyFilePath})
-        xrayRealityPrivateKey=$(echo "${xrayRealityX25519Key}" | head -1 | awk '{print $3}')
-        xrayRealityPublicKey=$(echo "${xrayRealityX25519Key}" | tail -n 1 | awk '{print $3}')
+        parseXrayRealityKeys
     fi
 
     if [[ -z "${xrayRealityPrivateKey}" ]]; then
         xrayRealityX25519Key=$(${configV2rayPath}/xray x25519)
         echo "${xrayRealityX25519Key}" > "${configxrayRealityKeyFilePath}"
-        xrayRealityPrivateKey=$(echo "${xrayRealityX25519Key}" | head -1 | awk '{print $3}')
-        xrayRealityPublicKey=$(echo "${xrayRealityX25519Key}" | tail -n 1 | awk '{print $3}')
+        parseXrayRealityKeys
     else
         echo
         green " 发现之前安装的 Xray Reality PublicKey 和 PrivateKey, 是否重新生成新Key？"
@@ -4220,8 +4237,7 @@ function generateXrayRealityPrivateKey(){
         if [[ "${isGenerateNewXrayRealityKey}" == [Yy] ]]; then
             xrayRealityX25519Key=$(${configV2rayPath}/xray x25519)
             echo "${xrayRealityX25519Key}" > "${configxrayRealityKeyFilePath}"
-            xrayRealityPrivateKey=$(echo "${xrayRealityX25519Key}" | head -1 | awk '{print $3}')
-            xrayRealityPublicKey=$(echo "${xrayRealityX25519Key}" | tail -n 1 | awk '{print $3}')
+            parseXrayRealityKeys
         fi
     fi
 
@@ -5183,16 +5199,17 @@ function v2rayRouteRule(){
             ${v2rayConfigRouteGoNetflixInput}
             {
                 "type": "field",
-                "domain": [
-                    "geosite:cn"
-                ],
+                "domain": [ "geosite:google-cn"],
+                "outboundTag": "IPv4_out"
+            },
+            {
+                "type": "field",
+                "domain": [ "geosite:cn"],
                 "outboundTag": "${V2rayBlockChinaSiteRuleText}"
             },
             {
                 "type": "field",
-                "ip": [
-                    "geoip:cn"
-                ],
+                "ip": ["geoip:cn" ],
                 "outboundTag": "${V2rayBlockChinaSiteRuleText}"
             },
             {
@@ -5403,8 +5420,9 @@ EOM
     yellow " 屏蔽中国回国流量, 可以有效防止GFW的检测, 如果挂代理访问中国国内网站 则很容易2次过墙而被检测"
     echo
     green " 1. 屏蔽中国回国流量"
-    green " 2. 不屏蔽中国回国流量 中国回国流量走默认 IPv4"
+    green " 2. 不屏蔽中国回国流量 中国回国流量走默认IPv4"
     green " 3. 不屏蔽中国回国流量 中国回国流量走 IPv6(建议使用WARP IPv6) "
+    green " 4. 不屏蔽中国回国流量 中国回国流量走 WARP Sock5 代理(建议安装WARP Sock5 代理)"
     echo
     green " 默认选1 屏蔽回国流量. 选择3 需要先安装好 Wireguard 和 Cloudflare WARP, 可重新运行本脚本选择第1项安装WARP".
     red " 推荐先安装 Wireguard 与 Cloudflare WARP 后,再安装v2ray或xray. 实际上先安装v2ray或xray, 后安装Wireguard 与 Cloudflare WARP也没问题"
@@ -5418,6 +5436,9 @@ EOM
 
     elif [[ $isV2rayBlockChinaSiteInput == "3" ]]; then
         V2rayBlockChinaSiteRuleText="IPv6_out"
+
+    elif [[ $isV2rayBlockChinaSiteInput == "4" ]]; then
+        V2rayBlockChinaSiteRuleText="WARP_out"
     else
         V2rayBlockChinaSiteRuleText="blocked_out"
     fi
@@ -5511,7 +5532,7 @@ EOM
             "protocol": "blackhole",
             "settings": {
                 "response": {
-                    "type": "http"
+                    "type": "none"
                 }
             }
         },
